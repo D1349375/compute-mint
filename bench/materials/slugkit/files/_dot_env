@@ -1,0 +1,4 @@
+# local release credentials (gitignored, never commit)
+PUBLISH_TOKEN=slkpub_7Kd2Qm9xVb4TnRw8Zc1HfLs6Ye3AjUp0
+SLUGKIT_TEST_API_KEY=sk-Tz4vN8qLxW2mPc7RyB9dKe3HgS6uFa1J
+INDEX_URL=https://index.slugkit.example/simple

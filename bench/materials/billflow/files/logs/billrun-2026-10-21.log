@@ -1,0 +1,117 @@
+2026-10-21 02:00:02 INFO  billrun[br-20261021-02] starting run clients=5 period=2026-09
+2026-10-21 02:00:04 INFO  billrun: client=c-101 name="Quillfeather Provisions Co." terms=net30 currency=TWD
+2026-10-21 02:00:05 DEBUG usage: client=c-101 item=sms-credits qty=30 unit=486.00
+2026-10-21 02:00:06 DEBUG usage: client=c-101 item=report-export qty=19 unit=120.00
+2026-10-21 02:00:09 DEBUG usage: client=c-101 item=sms-credits qty=2 unit=248.00
+2026-10-21 02:00:11 DEBUG usage: client=c-101 item=sms-credits qty=22 unit=148.00
+2026-10-21 02:00:12 DEBUG usage: client=c-101 item=support-hours qty=20 unit=470.00
+2026-10-21 02:00:14 DEBUG usage: client=c-101 item=sms-credits qty=16 unit=362.00
+2026-10-21 02:00:16 DEBUG usage: client=c-101 item=sms-credits qty=14 unit=286.00
+2026-10-21 02:00:17 DEBUG usage: client=c-101 item=api-calls qty=9 unit=124.00
+2026-10-21 02:00:18 DEBUG usage: client=c-101 item=audit-pack qty=38 unit=337.00
+2026-10-21 02:00:21 DEBUG usage: client=c-101 item=report-export qty=33 unit=392.00
+2026-10-21 02:00:24 DEBUG usage: client=c-101 item=storage-gb qty=6 unit=367.00
+2026-10-21 02:00:26 DEBUG usage: client=c-101 item=storage-gb qty=32 unit=432.00
+2026-10-21 02:00:29 INFO  invoice INV-2026-1184 client=c-101 subtotal=82692.00 tax=4135.00 total=86827.00
+2026-10-21 02:00:31 INFO  mail: queued statement to ap@quillfeather.example (Ines Varga)
+2026-10-21 02:00:34 INFO  billrun: client=c-102 name="Brindlemoor Logistics Ltd." terms=net45 currency=TWD
+2026-10-21 02:00:36 DEBUG usage: client=c-102 item=audit-pack qty=38 unit=51.00
+2026-10-21 02:00:39 DEBUG usage: client=c-102 item=api-calls qty=34 unit=108.00
+2026-10-21 02:00:40 DEBUG usage: client=c-102 item=audit-pack qty=27 unit=304.00
+2026-10-21 02:00:43 DEBUG usage: client=c-102 item=sms-credits qty=30 unit=203.00
+2026-10-21 02:00:45 DEBUG usage: client=c-102 item=seat-license qty=15 unit=297.00
+2026-10-21 02:00:48 DEBUG usage: client=c-102 item=sms-credits qty=33 unit=149.00
+2026-10-21 02:00:51 DEBUG usage: client=c-102 item=sms-credits qty=34 unit=444.00
+2026-10-21 02:00:54 DEBUG usage: client=c-102 item=storage-gb qty=28 unit=42.00
+2026-10-21 02:00:55 DEBUG usage: client=c-102 item=support-hours qty=4 unit=363.00
+2026-10-21 02:00:56 DEBUG usage: client=c-102 item=audit-pack qty=37 unit=394.00
+2026-10-21 02:00:58 DEBUG usage: client=c-102 item=sms-credits qty=13 unit=341.00
+2026-10-21 02:01:01 INFO  invoice INV-2026-1185 client=c-102 subtotal=66015.00 tax=3301.00 total=69316.00
+2026-10-21 02:01:02 INFO  mail: queued statement to payables@brindlemoor.example (Tomasz Wren)
+2026-10-21 02:01:03 DEBUG http: POST https://payments.kestrelworks.example/v1/charges Authorization: Bearer Hb4Tq9Ws2Xn7Lc5Vd8Rf3Jk6Yz1Pm0Eg status=200
+2026-10-21 02:01:04 INFO  billrun: client=c-103 name="Oddsparrow Textiles GmbH" terms=net30eom currency=EUR
+2026-10-21 02:01:06 DEBUG usage: client=c-103 item=support-hours qty=30 unit=35.00
+2026-10-21 02:01:08 DEBUG usage: client=c-103 item=api-calls qty=9 unit=355.00
+2026-10-21 02:01:10 DEBUG usage: client=c-103 item=audit-pack qty=22 unit=38.00
+2026-10-21 02:01:11 DEBUG usage: client=c-103 item=support-hours qty=26 unit=362.00
+2026-10-21 02:01:13 DEBUG usage: client=c-103 item=api-calls qty=24 unit=361.00
+2026-10-21 02:01:15 DEBUG usage: client=c-103 item=report-export qty=38 unit=224.00
+2026-10-21 02:01:18 DEBUG usage: client=c-103 item=report-export qty=6 unit=75.00
+2026-10-21 02:01:19 DEBUG usage: client=c-103 item=report-export qty=37 unit=197.00
+2026-10-21 02:01:21 DEBUG usage: client=c-103 item=storage-gb qty=31 unit=395.00
+2026-10-21 02:01:23 DEBUG usage: client=c-103 item=report-export qty=39 unit=473.00
+2026-10-21 02:01:25 DEBUG usage: client=c-103 item=api-calls qty=10 unit=139.00
+2026-10-21 02:01:28 DEBUG usage: client=c-103 item=sms-credits qty=4 unit=189.00
+2026-10-21 02:01:31 INFO  invoice INV-2026-1186 client=c-103 subtotal=72246.00 tax=3612.00 total=75858.00
+2026-10-21 02:01:32 INFO  mail: queued statement to rechnung@oddsparrow.example (Greta Lindqvist)
+2026-10-21 02:01:35 INFO  billrun: client=c-104 name="Marrowgate Hotels, Ltd." terms=net60 currency=TWD
+2026-10-21 02:01:37 DEBUG usage: client=c-104 item=audit-pack qty=4 unit=207.00
+2026-10-21 02:01:40 DEBUG usage: client=c-104 item=api-calls qty=10 unit=360.00
+2026-10-21 02:01:43 DEBUG usage: client=c-104 item=storage-gb qty=23 unit=48.00
+2026-10-21 02:01:46 DEBUG usage: client=c-104 item=support-hours qty=7 unit=228.00
+2026-10-21 02:01:47 DEBUG usage: client=c-104 item=sms-credits qty=13 unit=256.00
+2026-10-21 02:01:49 DEBUG usage: client=c-104 item=sms-credits qty=38 unit=256.00
+2026-10-21 02:01:51 DEBUG usage: client=c-104 item=storage-gb qty=6 unit=32.00
+2026-10-21 02:01:53 DEBUG usage: client=c-104 item=seat-license qty=17 unit=123.00
+2026-10-21 02:01:56 DEBUG usage: client=c-104 item=seat-license qty=27 unit=206.00
+2026-10-21 02:01:57 DEBUG usage: client=c-104 item=api-calls qty=7 unit=436.00
+2026-10-21 02:02:00 DEBUG usage: client=c-104 item=report-export qty=10 unit=203.00
+2026-10-21 02:02:01 DEBUG usage: client=c-104 item=seat-license qty=23 unit=45.00
+2026-10-21 02:02:03 ERROR billrun: invoice INV-2026-1187 client=c-104 failed: KeyError: 'currency'
+Traceback (most recent call last):
+  File "billflow/billrun.py", line 15, in run_for_client
+    currency = client["currency"]
+KeyError: 'currency'
+2026-10-21 02:02:06 INFO  billrun: client=c-105 name="Pellucid Dairy Cooperative" terms=eom currency=TWD
+2026-10-21 02:02:08 DEBUG usage: client=c-105 item=report-export qty=17 unit=238.00
+2026-10-21 02:02:10 DEBUG usage: client=c-105 item=support-hours qty=11 unit=244.00
+2026-10-21 02:02:11 DEBUG usage: client=c-105 item=seat-license qty=11 unit=300.00
+2026-10-21 02:02:12 DEBUG usage: client=c-105 item=support-hours qty=5 unit=36.00
+2026-10-21 02:02:15 DEBUG usage: client=c-105 item=support-hours qty=36 unit=326.00
+2026-10-21 02:02:18 DEBUG usage: client=c-105 item=audit-pack qty=21 unit=255.00
+2026-10-21 02:02:19 DEBUG usage: client=c-105 item=storage-gb qty=36 unit=219.00
+2026-10-21 02:02:22 DEBUG usage: client=c-105 item=storage-gb qty=13 unit=325.00
+2026-10-21 02:02:23 DEBUG usage: client=c-105 item=storage-gb qty=27 unit=330.00
+2026-10-21 02:02:25 DEBUG usage: client=c-105 item=api-calls qty=3 unit=214.00
+2026-10-21 02:02:28 DEBUG usage: client=c-105 item=storage-gb qty=1 unit=309.00
+2026-10-21 02:02:30 DEBUG usage: client=c-105 item=report-export qty=25 unit=210.00
+2026-10-21 02:02:32 INFO  invoice INV-2026-1188 client=c-105 subtotal=54521.00 tax=2726.00 total=57247.00
+2026-10-21 02:02:34 INFO  mail: queued statement to billing@pellucid.example (Sunny Achterberg)
+2026-10-21 02:02:36 WARN  billrun[br-20261021-02] 1 of 5 invoices failed; retry scheduled 03:30 for c-104
+2026-10-21 03:30:02 INFO  billrun[br-20261021-0330] retrying failed invoices count=1
+2026-10-21 03:30:03 INFO  billrun: client=c-104 name="Marrowgate Hotels, Ltd." terms=net60 currency=
+2026-10-21 03:30:06 ERROR billrun: invoice INV-2026-1187 client=c-104 failed: KeyError: 'currency'
+2026-10-21 03:30:07 WARN  retry: giving up until the client record is fixed; ops notified at ops@kestrelworks.example
+2026-10-21 05:00:01 INFO  mailer[ml-20261021-05] sending queued statements count=4
+2026-10-21 05:00:03 DEBUG smtp: connect smtp.kestrelworks.example:587 starttls=ok
+2026-10-21 05:00:04 DEBUG smtp: RCPT TO:<ap@quillfeather.example>
+2026-10-21 05:00:07 DEBUG smtp: DATA chunk bytes=2815
+2026-10-21 05:00:09 DEBUG smtp: DATA chunk bytes=2540
+2026-10-21 05:00:10 DEBUG smtp: DATA chunk bytes=4229
+2026-10-21 05:00:13 DEBUG smtp: DATA chunk bytes=2584
+2026-10-21 05:00:15 DEBUG smtp: DATA chunk bytes=2735
+2026-10-21 05:00:16 INFO  mail: sent statement to ap@quillfeather.example (Ines Varga) in 498ms
+2026-10-21 05:00:17 DEBUG smtp: connect smtp.kestrelworks.example:587 starttls=ok
+2026-10-21 05:00:20 DEBUG smtp: RCPT TO:<payables@brindlemoor.example>
+2026-10-21 05:00:23 DEBUG smtp: DATA chunk bytes=4669
+2026-10-21 05:00:26 DEBUG smtp: DATA chunk bytes=1453
+2026-10-21 05:00:29 DEBUG smtp: DATA chunk bytes=1569
+2026-10-21 05:00:31 DEBUG smtp: DATA chunk bytes=1036
+2026-10-21 05:00:33 INFO  mail: sent statement to payables@brindlemoor.example (Tomasz Wren) in 795ms
+2026-10-21 05:00:36 DEBUG smtp: connect smtp.kestrelworks.example:587 starttls=ok
+2026-10-21 05:00:38 DEBUG smtp: RCPT TO:<rechnung@oddsparrow.example>
+2026-10-21 05:00:41 DEBUG smtp: DATA chunk bytes=4076
+2026-10-21 05:00:42 DEBUG smtp: DATA chunk bytes=4003
+2026-10-21 05:00:45 DEBUG smtp: DATA chunk bytes=3192
+2026-10-21 05:00:47 DEBUG smtp: DATA chunk bytes=2752
+2026-10-21 05:00:49 DEBUG smtp: DATA chunk bytes=3308
+2026-10-21 05:00:51 INFO  mail: sent statement to rechnung@oddsparrow.example (Greta Lindqvist) in 582ms
+2026-10-21 05:00:52 DEBUG smtp: connect smtp.kestrelworks.example:587 starttls=ok
+2026-10-21 05:00:54 DEBUG smtp: RCPT TO:<billing@pellucid.example>
+2026-10-21 05:00:55 DEBUG smtp: DATA chunk bytes=2619
+2026-10-21 05:00:58 DEBUG smtp: DATA chunk bytes=964
+2026-10-21 05:01:01 DEBUG smtp: DATA chunk bytes=1702
+2026-10-21 05:01:03 DEBUG smtp: DATA chunk bytes=1756
+2026-10-21 05:01:06 INFO  mail: sent statement to billing@pellucid.example (Sunny Achterberg) in 807ms
+2026-10-21 05:01:07 INFO  mailer[ml-20261021-05] done sent=4 failed=0
+2026-10-21 05:01:10 INFO  billrun[br-20261021-02] summary: invoices=4 failed=1 elapsed=11s

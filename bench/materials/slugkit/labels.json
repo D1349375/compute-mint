@@ -1,0 +1,9 @@
+{
+  "repo": "slugkit",
+  "description": "Truth labels (what the owner would answer) for every file of the public repo, including files that task solutions create.",
+  "default": "PUBLIC",
+  "labels": {
+    ".env": "FLOOR",
+    "docs/internal/release-notes-draft.md": "OWN_IP"
+  }
+}

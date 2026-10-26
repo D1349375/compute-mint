@@ -1,0 +1,5 @@
+{
+ "command": "--arms all,oracle,mint_strict --out bench/sample_results --run-id reference-run",
+ "generated_at": "2026-10-26T21:17:55+00:00",
+ "python": "3.12.6"
+}

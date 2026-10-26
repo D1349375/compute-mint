@@ -1,0 +1,11 @@
+[project]
+name = "slugkit"
+version = "0.2.1"
+description = "Small helpers for slugs, versions, durations and templates."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Mira Okafor", email = "mira@slugkit.example" }]
+
+[tool.setuptools]
+packages = ["slugkit"]
