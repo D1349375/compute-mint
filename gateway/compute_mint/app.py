@@ -16,6 +16,7 @@ from .broker import Broker
 from .context import Provenance, fingerprint
 from .labels import Label
 from .ledger import Ledger
+from .policy import Policy
 from .pricing import Usage
 from .router import CONTRIBUTOR, payload_digest, rehydrate_response, route
 from .vault import Vault
@@ -30,6 +31,7 @@ class Config:
     contributor_model: str = os.environ.get("CONTRIBUTOR_MODEL", "muse-spark-1.3-contributor")
     standard_model: str = os.environ.get("STANDARD_MODEL", "muse-spark-1.3")
     ledger_path: str = os.environ.get("LEDGER_PATH", ":memory:")
+    policy_path: str = os.environ.get("POLICY_PATH", ":memory:")
 
 
 @dataclass
@@ -43,10 +45,12 @@ def create_app(config: Config | None = None, transport: httpx.AsyncBaseTransport
     config = config or Config()
     app = FastAPI(title="Compute Mint gateway")
     ledger = Ledger(config.ledger_path)
+    policy = Policy(config.policy_path)
     sessions: dict[str, SessionState] = {}
     client = httpx.AsyncClient(base_url=config.api_base, transport=transport, timeout=300,
                                headers={"Authorization": f"Bearer {config.api_key}"})
     app.state.ledger = ledger
+    app.state.policy = policy
     app.state.sessions = sessions
 
     def header_label(request: Request, name: str, default: str) -> Label:
@@ -68,7 +72,10 @@ def create_app(config: Config | None = None, transport: httpx.AsyncBaseTransport
         dial = header_label(request, "x-cm-dial", "public")
         state = sessions.setdefault(session_id, SessionState())
 
-        decision = route(messages, baseline=baseline, dial=dial, vault=state.vault, provenance=state.provenance)
+        decision = route(messages, baseline=baseline, dial=dial, vault=state.vault, provenance=state.provenance,
+                         baseline_for=policy.baseline_for(messages, baseline))
+        if decision.blocked_by:
+            policy.enqueue_unknown(messages, decision.blocked_by)
         model = config.contributor_model if decision.lane == CONTRIBUTOR else config.standard_model
         sent, bstats = state.broker.apply(decision.messages)
         upstream_body = {**body, "model": model, "messages": sent}
@@ -103,6 +110,22 @@ def create_app(config: Config | None = None, transport: httpx.AsyncBaseTransport
     @app.get("/v1/ledger/summary")
     async def summary(session: str | None = None) -> dict:
         return ledger.summary(session)
+
+    @app.get("/v1/review")
+    async def review_queue() -> dict:
+        return {"pending": policy.pending(), "rules": [{"pattern": p, "label": l.name} for p, l in policy.rules()]}
+
+    @app.post("/v1/review/{item_id}")
+    async def review_decide(item_id: int, request: Request) -> dict:
+        body = await request.json()
+        label = LABEL_NAMES.get(str(body.get("label", "")).lower())
+        if label is None:
+            raise HTTPException(400, f"label must be one of {sorted(LABEL_NAMES)}")
+        try:
+            pattern = policy.decide(item_id, label, body.get("pattern"))
+        except KeyError:
+            raise HTTPException(404, "no such review item")
+        return {"pattern": pattern, "label": label.name}
 
     return app
 

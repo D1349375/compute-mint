@@ -17,7 +17,9 @@ Point an agent at `http://localhost:8787/v1`. Per-request headers:
 | `x-cm-project` | `public`, `own_ip`, `confidential` | baseline label of this project's content |
 | `x-cm-dial` | `public`, `own_ip` | strictest label the user agrees to contribute |
 
-`GET /v1/ledger/summary` returns spend, counterfactual spend, savings and the contributable token share.
+`GET /v1/ledger/summary` returns spend, counterfactual spend, savings, the contributable token share, the cache hit rate and the Context Broker's context ratio.
+
+`GET /v1/review` lists files waiting for a sensitivity decision and the learned rules; `POST /v1/review/{id}` with `{"label": "public|own_ip|confidential", "pattern": "<optional glob>"}` turns a decision into a rule. Files with no rule are treated as confidential until reviewed; credential files (`.env`, keys, `auth.json`, …) are always FLOOR.
 
 | Module | Role |
 |---|---|
@@ -26,5 +28,7 @@ Point an agent at `http://localhost:8787/v1`. Per-request headers:
 | `vault.py` | session-consistent placeholders and rehydration |
 | `context.py` | taint tracking; provenance of gateway-generated replies |
 | `router.py` | lane decision and clean-context assembly |
+| `broker.py` | cache-aware Context Broker: compacts aged tool outputs once, memoized, so the cached prefix keeps matching |
+| `policy.py` | learned path rules and the review queue; credential files are always FLOOR |
 | `pricing.py`, `ledger.py` | official prices and the counterfactual ledger |
 | `app.py` | the proxy |

@@ -47,16 +47,18 @@ def _mask_message(msg: dict, vault: Vault) -> tuple[dict, int]:
     return m, total
 
 
-def route(messages: list[dict], *, baseline: Label, dial: Label, vault: Vault, provenance: Provenance) -> Decision:
-    labeled = label_messages(messages, baseline, provenance)
+def route(messages: list[dict], *, baseline: Label, dial: Label, vault: Vault, provenance: Provenance,
+          baseline_for=None) -> Decision:
+    labeled = label_messages(messages, baseline, provenance, baseline_for)
     raw_label = join(*(lm.effective for lm in labeled))
 
     masked, residuals, spans = [], [], 0
     running_raw = Label.PUBLIC
-    for lm in labeled:
+    for i, lm in enumerate(labeled):
         m, n = _mask_message(lm.msg, vault)
         spans += n
-        residual_own = Label.FLOOR if has_floor(message_text(m)) else baseline
+        base = baseline_for(i, lm.msg) if baseline_for else baseline
+        residual_own = Label.FLOOR if has_floor(message_text(m)) else base
         if lm.msg.get("role") == "assistant":
             known = provenance.lookup(lm.msg)
             # An assistant message we did not generate may paraphrase anything it saw,

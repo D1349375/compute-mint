@@ -54,11 +54,14 @@ class LabeledMessage:
     effective: Label  # own label joined with whatever it was derived from
 
 
-def label_messages(messages: list[dict], baseline: Label, provenance: Provenance) -> list[LabeledMessage]:
+def label_messages(messages: list[dict], baseline: Label, provenance: Provenance,
+                   baseline_for=None) -> list[LabeledMessage]:
+    """`baseline_for(i, msg)` optionally overrides the project baseline per message (learned rules)."""
     out: list[LabeledMessage] = []
     running = Label.PUBLIC
-    for msg in messages:
-        own = Label.FLOOR if has_floor(message_text(msg)) else baseline
+    for i, msg in enumerate(messages):
+        base = baseline_for(i, msg) if baseline_for else baseline
+        own = Label.FLOOR if has_floor(message_text(msg)) else base
         if msg.get("role") == "assistant":
             known = provenance.lookup(msg)
             derived = known if known is not None else running
