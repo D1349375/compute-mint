@@ -12,6 +12,7 @@ import httpx
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 
+from .broker import Broker
 from .context import Provenance, fingerprint
 from .labels import Label
 from .ledger import Ledger
@@ -35,6 +36,7 @@ class Config:
 class SessionState:
     vault: Vault = field(default_factory=Vault)
     provenance: Provenance = field(default_factory=Provenance)
+    broker: Broker = field(default_factory=Broker)
 
 
 def create_app(config: Config | None = None, transport: httpx.AsyncBaseTransport | None = None) -> FastAPI:
@@ -68,7 +70,8 @@ def create_app(config: Config | None = None, transport: httpx.AsyncBaseTransport
 
         decision = route(messages, baseline=baseline, dial=dial, vault=state.vault, provenance=state.provenance)
         model = config.contributor_model if decision.lane == CONTRIBUTOR else config.standard_model
-        upstream_body = {**body, "model": model, "messages": decision.messages}
+        sent, bstats = state.broker.apply(decision.messages)
+        upstream_body = {**body, "model": model, "messages": sent}
 
         resp = await client.post("/chat/completions", json=upstream_body)
         if resp.status_code >= 400:
@@ -85,13 +88,15 @@ def create_app(config: Config | None = None, transport: httpx.AsyncBaseTransport
             session=session_id, lane=decision.lane, model=model, context_label=decision.context_label,
             usage=Usage.from_openai(data.get("usage")), masked_spans=decision.masked_spans,
             reason=decision.reason,
-            sent_payload=payload_digest(decision.messages) if decision.lane == CONTRIBUTOR else None,
+            sent_payload=payload_digest(sent) if decision.lane == CONTRIBUTOR else None,
+            chars_in=bstats.chars_in, chars_out=bstats.chars_out,
         )
         headers = {
             "x-cm-lane": decision.lane,
             "x-cm-cost": f"{row['cost']:.6f}",
             "x-cm-counterfactual": f"{row['counterfactual']:.6f}",
             "x-cm-masked-spans": str(decision.masked_spans),
+            "x-cm-broker-chars": f"{bstats.chars_in}->{bstats.chars_out}",
         }
         return JSONResponse(data, headers=headers)
 

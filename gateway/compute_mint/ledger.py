@@ -20,7 +20,9 @@ CREATE TABLE IF NOT EXISTS requests (
     counterfactual REAL NOT NULL,
     masked_spans INTEGER NOT NULL,
     reason TEXT NOT NULL,
-    sent_payload TEXT            -- what left the machine; only stored for Contributor requests
+    sent_payload TEXT,           -- what left the machine; only stored for Contributor requests
+    chars_in INTEGER NOT NULL DEFAULT 0,   -- context size before the Context Broker
+    chars_out INTEGER NOT NULL DEFAULT 0   -- context size actually sent
 );
 """
 
@@ -31,13 +33,14 @@ class Ledger:
         self.db.executescript(SCHEMA)
 
     def record(self, *, session: str, lane: str, model: str, context_label: int, usage: Usage,
-               masked_spans: int, reason: str, sent_payload: str | None) -> dict:
+               masked_spans: int, reason: str, sent_payload: str | None,
+               chars_in: int = 0, chars_out: int = 0) -> dict:
         row = dict(
             ts=time.time(), session=session, lane=lane, model=model, context_label=int(context_label),
             prompt_tokens=usage.prompt_tokens, cached_tokens=usage.cached_tokens,
             completion_tokens=usage.completion_tokens, cost=cost(model, usage),
             counterfactual=counterfactual_cost(model, usage), masked_spans=masked_spans,
-            reason=reason, sent_payload=sent_payload,
+            reason=reason, sent_payload=sent_payload, chars_in=chars_in, chars_out=chars_out,
         )
         cols = ", ".join(row)
         self.db.execute(f"INSERT INTO requests ({cols}) VALUES ({', '.join('?' * len(row))})", tuple(row.values()))
@@ -49,9 +52,11 @@ class Ledger:
         cur = self.db.execute(
             f"""SELECT COUNT(*), COALESCE(SUM(cost),0), COALESCE(SUM(counterfactual),0),
                        COALESCE(SUM(CASE WHEN lane='contributor' THEN prompt_tokens+completion_tokens END),0),
-                       COALESCE(SUM(prompt_tokens+completion_tokens),0)
+                       COALESCE(SUM(prompt_tokens+completion_tokens),0),
+                       COALESCE(SUM(cached_tokens),0), COALESCE(SUM(prompt_tokens),0),
+                       COALESCE(SUM(chars_in),0), COALESCE(SUM(chars_out),0)
                 FROM requests {where}""", args)
-        n, spent, cf, contrib_tokens, all_tokens = cur.fetchone()
+        n, spent, cf, contrib_tokens, all_tokens, cached, prompt, c_in, c_out = cur.fetchone()
         return {
             "requests": n,
             "spent_usd": spent,
@@ -59,4 +64,6 @@ class Ledger:
             "saved_usd": cf - spent,
             "contributable_token_share": contrib_tokens / all_tokens if all_tokens else 0.0,
             "effective_compute_multiplier": cf / spent if spent else None,
+            "cache_hit_rate": cached / prompt if prompt else 0.0,
+            "broker_context_ratio": c_out / c_in if c_in else 1.0,
         }
