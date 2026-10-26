@@ -4,6 +4,7 @@ Agents point their base_url at this server. Per-request headers:
 - x-cm-session: session id (defaults to a hash of the first message)
 - x-cm-project: baseline label of this project's content: public | own_ip | confidential
 - x-cm-dial:    strictest label the user agrees to contribute: public | own_ip
+- x-cm-client:  model behind the calling agent: anthropic | openai | unknown (default unknown)
 """
 import os
 from dataclasses import dataclass, field
@@ -16,6 +17,7 @@ from .broker import Broker
 from .context import Provenance, fingerprint
 from .labels import Label
 from .ledger import Ledger
+from .origin import OriginTracker, parse_client
 from .pricing import Usage
 from .router import CONTRIBUTOR, payload_digest, rehydrate_response, route
 from .vault import Vault
@@ -37,6 +39,7 @@ class SessionState:
     vault: Vault = field(default_factory=Vault)
     provenance: Provenance = field(default_factory=Provenance)
     broker: Broker = field(default_factory=Broker)
+    origin: OriginTracker = field(default_factory=OriginTracker)
 
 
 def create_app(config: Config | None = None, transport: httpx.AsyncBaseTransport | None = None) -> FastAPI:
@@ -66,9 +69,15 @@ def create_app(config: Config | None = None, transport: httpx.AsyncBaseTransport
         session_id = request.headers.get("x-cm-session") or fingerprint(messages[0])[:16]
         baseline = header_label(request, "x-cm-project", "own_ip")
         dial = header_label(request, "x-cm-dial", "public")
+        try:
+            caller = parse_client(request.headers.get("x-cm-client"))
+        except ValueError as e:
+            raise HTTPException(400, str(e))
         state = sessions.setdefault(session_id, SessionState())
 
-        decision = route(messages, baseline=baseline, dial=dial, vault=state.vault, provenance=state.provenance)
+        origins = state.origin.of_messages(messages, state.provenance, caller)
+        decision = route(messages, baseline=baseline, dial=dial, vault=state.vault, provenance=state.provenance,
+                         origins=origins)
         model = config.contributor_model if decision.lane == CONTRIBUTOR else config.standard_model
         sent, bstats = state.broker.apply(decision.messages)
         upstream_body = {**body, "model": model, "messages": sent}
@@ -83,6 +92,7 @@ def create_app(config: Config | None = None, transport: httpx.AsyncBaseTransport
         for choice in data.get("choices", []):
             if choice.get("message"):
                 state.provenance.record(choice["message"], decision.context_label)
+                state.origin.record_reply(choice["message"], origins)
 
         row = ledger.record(
             session=session_id, lane=decision.lane, model=model, context_label=decision.context_label,

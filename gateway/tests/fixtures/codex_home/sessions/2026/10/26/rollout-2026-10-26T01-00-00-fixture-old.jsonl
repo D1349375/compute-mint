@@ -1,0 +1,2 @@
+{"timestamp": "2026-10-26T01:00:00.000Z", "type": "session_meta", "payload": {"id": "fixture-old"}}
+{"timestamp": "2026-10-26T01:05:00.000Z", "type": "event_msg", "payload": {"type": "token_count", "info": {"total_token_usage": {"input_tokens": 1, "output_tokens": 1}}, "rate_limits": {"primary": {"used_percent": 10.0, "window_minutes": 300, "resets_at": 1792900000}, "secondary": {"used_percent": 5.0, "window_minutes": 10080, "resets_at": 1793500000}, "plan_type": "plus"}}}
