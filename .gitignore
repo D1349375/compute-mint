@@ -1,0 +1,26 @@
+# secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# node
+node_modules/
+.next/
+
+# local data (never commit real session content)
+data/
+*.sqlite
+*.db
+bench/private/
+
+# os
+.DS_Store
+Thumbs.db

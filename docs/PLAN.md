@@ -1,0 +1,30 @@
+# 開發計畫
+
+完整架構與「可做／願景」邊界，在 Obsidian vault 的 `Side Project/競賽/Meta ai 黑客松/2026-10-27_Compute_Mint_深化架構_可做與願景邊界.md`（不隨 repo 公開）。這份只列實作順序與驗收條件。
+
+截止：2026-11-04 9:00 PM ET（台灣 11/5 10:00）。提交前 repo 要改成公開。
+
+## 技術選型（初版，模型選用待使用者確認）
+- `gateway/`：Python 3.12＋FastAPI，提供 OpenAI 相容的 `/v1/chat/completions`。
+- `dashboard/`：Next.js。
+- 模型：
+  - Muse Spark 1.3（`muse-spark-1.3` 與 `muse-spark-1.3-contributor`）：主要工作模型
+  - Muse Glimmer（託管）：敏感度判斷、機密通道、外洩攻擊者
+  - **以上都待使用者核准**
+- 狀態儲存：SQLite。
+
+## 里程碑
+| 日期 | 交付 | 驗收 |
+|---|---|---|
+| 10/27–28 | L0 proxy、L1 標籤格與汙染傳遞、乾淨 context 組裝、L2 確定性偵測、L7 帳本 | 單元測試：含 FLOOR 祖先的項目永遠進不了 Contributor 請求；帳本的反事實成本可以重算 |
+| 10/29–30 | L2 Glimmer 判斷、L3 遮罩回填與 AST 化名、抽出公開子問題、L8 回饋學習 | 化名後的 repo 測試結果和原版一致 |
+| 10/31–11/1 | `bench/` 驗收任務集（30 題以上，依時間切分）、五組對照、L9 儀表板 | 量出 e、通過率、外洩還原率、每任務成本 |
+| 10/31 晚 | 檢查點：核心完成才做 P2P 切片（stretch） | — |
+| 11/2 | 紅隊外洩測試、外部試用 | — |
+| 11/3 | 錄影、剪輯、公開展示頁 | — |
+| 11/4 | 整理 repo、`docs/BUILD_LOG.md`、提交、改公開 | — |
+
+## 不可違反的規則
+- 金鑰只放 `.env`，絕不 commit。
+- demo 和 bench 不得放入真實的 session 內容，只能用彙總數字。
+- Contributor 請求一律從乾淨 context 重新組裝，不得沿用原 session 歷史。
