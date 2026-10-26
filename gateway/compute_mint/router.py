@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from .context import Provenance, label_messages, message_text
 from .detect import has_floor
 from .labels import Label, contributable, join
+from .origin import Origin, message_origins, origin_allows_contributor
 from .vault import Vault
 
 CONTRIBUTOR = "contributor"
@@ -48,7 +49,10 @@ def _mask_message(msg: dict, vault: Vault) -> tuple[dict, int]:
 
 
 def route(messages: list[dict], *, baseline: Label, dial: Label, vault: Vault, provenance: Provenance,
-          baseline_for=None) -> Decision:
+          baseline_for=None, origins: list[Origin] | None = None) -> Decision:
+    # Contributor needs the label to fit the dial AND every message to come from an allowed origin.
+    if origins is None:
+        origins = message_origins(messages, provenance)
     labeled = label_messages(messages, baseline, provenance, baseline_for)
     raw_label = join(*(lm.effective for lm in labeled))
 
@@ -70,12 +74,14 @@ def route(messages: list[dict], *, baseline: Label, dial: Label, vault: Vault, p
         residuals.append(residual)
         running_raw = join(running_raw, lm.effective)
 
-    blocked = [i for i, r in enumerate(residuals) if not contributable(r, dial)]
+    by_origin = [i for i, o in enumerate(origins) if not origin_allows_contributor(o)]
+    blocked = sorted({i for i, r in enumerate(residuals) if not contributable(r, dial)} | set(by_origin))
     if not blocked:
         return Decision(CONTRIBUTOR, masked, join(*residuals), spans,
                         reason="all context contributable after masking")
     return Decision(STANDARD, [copy.deepcopy(m) for m in messages], raw_label, 0,
-                    reason=f"{len(blocked)} message(s) not contributable", blocked_by=blocked)
+                    reason=f"{len(blocked)} message(s) not contributable"
+                           + (f" ({len(by_origin)} by origin)" if by_origin else ""), blocked_by=blocked)
 
 
 def rehydrate_response(body: dict, vault: Vault) -> dict:

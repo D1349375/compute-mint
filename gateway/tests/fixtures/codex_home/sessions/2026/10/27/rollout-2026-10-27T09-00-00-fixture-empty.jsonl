@@ -1,0 +1,2 @@
+{"timestamp": "2026-10-27T09:00:00.000Z", "type": "session_meta", "payload": {"id": "fixture-empty"}}
+{"timestamp": "2026-10-27T09:00:05.000Z", "type": "event_msg", "payload": {"type": "token_count", "info": {"total_token_usage": {"input_tokens": 1, "output_tokens": 1}}, "rate_limits": null}}
