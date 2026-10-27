@@ -92,7 +92,9 @@ def run_arm(spec: ArmSpec, tasks: tuple[IndexedTask, ...], options: RunOptions) 
     recorder = RecordingTransport(upstream.transport())
     config = Config(api_base="https://mock.invalid/v1", api_key="mock-key-not-a-real-key",
                     contributor_model=CONTRIBUTOR_MODEL, standard_model=STANDARD_MODEL,
-                    ledger_path=":memory:", policy_path=":memory:")
+                    ledger_path=":memory:", policy_path=":memory:",
+                    output_paths=spec.output_paths, fingerprints=spec.fingerprints,
+                    fingerprint_threshold=spec.fingerprint_threshold)
     app = create_app(config, transport=recorder)
     if spec.strict_tools:
         strict_tool_outputs(app.state.policy)
@@ -111,7 +113,7 @@ def run_arm(spec: ArmSpec, tasks: tuple[IndexedTask, ...], options: RunOptions) 
         task = it.task
         repo = repos[task.repo]
         session = f"{spec.name}-{task.id}"
-        headers = {"x-cm-session": session, **task.headers(repo.headers)}
+        headers = {"x-cm-session": session, "x-cm-root": mount_for(task.repo), **task.headers(repo.headers)}
         if spec.all_standard:
             headers["x-cm-project"] = "confidential"
         broker = Broker() if spec.broker else Broker(BrokerConfig(compact_over_chars=10 ** 12))

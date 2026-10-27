@@ -78,10 +78,51 @@ def test_credentials_read_by_the_agent_never_reach_contributor(runs):
     assert not any(v["canary"].startswith("pub-") for name in ("mint", "mint_broker", "mint_learn") for v in runs[name].violations)
 
 
-def test_any_canary_that_gets_through_comes_from_a_known_vector(runs):
-    """Violations may only come from tasks whose test output names customers (the documented gap); nothing else."""
-    for name in ("mint", "mint_broker", "mint_learn"):
-        assert {v["task_id"] for v in runs[name].violations} <= LEAK_VECTOR_TASKS
+def test_no_canary_gets_through_in_the_small_set(runs):
+    """The small set holds T14, a leak-vector task; its customer names were never read in this set, so only the
+    paths printed by the test run stand between them and Contributor (see the known-limit test below)."""
+    for name in ("mint", "mint_broker"):
+        assert runs[name].violations == []
+    assert {v["task_id"] for v in runs["mint_learn"].violations} <= LEAK_VECTOR_TASKS
+
+
+LEAK_IDS = ["T04", "T14", "T20", "T26"]   # T04 reads the client register, T14/T20/T26 print customer names in a test failure
+
+
+@pytest.fixture(scope="module")
+def leak_runs():
+    tasks = select(LEAK_IDS)
+    return {name: run_arm(ARM_SPECS[name], tasks, RunOptions())
+            for name in ("mint", "mint_broker", "mint_learn", "oracle", "learn_nofix", "learn_fp")}
+
+
+def test_the_test_output_leak_is_closed_in_every_mint_arm(leak_runs):
+    for name in ("mint", "mint_broker", "mint_learn", "oracle", "learn_fp"):
+        assert leak_runs[name].violations == [], name
+        assert all(t["passed"] for t in leak_runs[name].tasks)
+
+
+def test_the_gateway_without_the_fix_still_leaks_the_same_names(leak_runs):
+    """`learn_nofix` is arm 5 on the gateway as it was: path rules for tool-call arguments only."""
+    before = leak_runs["learn_nofix"]
+    assert {v["task_id"] for v in before.violations} == LEAK_VECTOR_TASKS
+    assert {v["where"].split(" (message")[0].split("(")[0].strip() for v in before.violations} == {"tool: run_tests"}
+    assert {"customer_name", "person_name"} <= {v["kind"] for v in before.violations}
+
+
+def test_fingerprints_cost_only_the_requests_that_carried_the_names(leak_runs):
+    """Same reviewer, same tasks: the tokens that moved from Contributor to Standard are those of the three leaking tasks."""
+    nofix, fixed = by_id(leak_runs["learn_nofix"]), by_id(leak_runs["learn_fp"])
+    moved = {tid for tid in nofix if nofix[tid]["tokens"]["contributor"] != fixed[tid]["tokens"]["contributor"]}
+    assert moved == LEAK_VECTOR_TASKS
+    assert all(fixed[tid]["tokens"]["contributor"] < nofix[tid]["tokens"]["contributor"] for tid in moved)
+
+
+def test_known_limit_names_the_gateway_never_saw_still_pass():
+    """Honest limit of the deterministic fix: if the agent never read the register through the gateway, nothing ties the
+    names in the test output to anything sensitive (only a semantic judge could). This pins the limit so a change in it is noticed."""
+    run = run_arm(ARM_SPECS["oracle"], select(["T14"]), RunOptions())      # every path rule known: the test file is fine
+    assert {v["task_id"] for v in run.violations} == {"T14-notify-singular-day"}
 
 
 def test_rule_learning_moves_later_tasks_to_contributor(runs):
@@ -210,7 +251,8 @@ def test_meta_upstream_is_reserved_and_makes_no_call(capsys, monkeypatch):
 
 def test_what_if_shim_closes_the_test_output_gap_at_a_price():
     """Treating tool output that names no file as unreviewed removes the leak and costs contributable share.
-    The shim only changes one app's policy instance; the gateway source is not involved."""
+    The shim only changes one app's policy instance; the gateway source is not involved. T02 + T14 is the
+    case the gateway's own fix cannot see (the names were never read), so `mint_learn` still leaks here."""
     tasks = select(["T02", "T14"])
     plain = run_arm(ARM_SPECS["mint_learn"], tasks, RunOptions())
     strict = run_arm(ARM_SPECS["mint_strict"], tasks, RunOptions())
@@ -225,7 +267,7 @@ def test_results_do_not_depend_on_the_hash_seed():
             "sys.path[:0] = [%r, %r]\n"
             "from bench.armtypes import RunOptions\n"
             "from bench.run import run_bench\n"
-            "print(json.dumps(run_bench(['standard', 'oracle', 'naive'], RunOptions(), ['T02', 'T08', 'T36']), sort_keys=True))\n"
+            "print(json.dumps(run_bench(['standard', 'mint_learn', 'oracle', 'naive'], RunOptions(), ['T02', 'T04', 'T14', 'T36']), sort_keys=True))\n"
             % (str(BENCH_DIR.parent), str(BENCH_DIR.parent / "gateway")))
     outs = []
     for seed in ("1", "2"):

@@ -1,0 +1,927 @@
+{
+ "note": "Headline numbers of the reference run before the leak fix (gateway commit 3134d6b: tool output labeled by the paths in the tool call only). Slimmed from results.json; summary.md next to it is the full report of that run.",
+ "options": {
+  "cache_block_tokens": 64,
+  "naive_switch": "mid",
+  "reviewer_error_rate": 0.0,
+  "reviews_per_task": 2,
+  "seed": 1,
+  "upstream": "mock"
+ },
+ "summaries": {
+  "mint": {
+   "arm": "mint",
+   "baseline_standard_usd": 0.19164235,
+   "broker_ratio": 1.0,
+   "cache_hit_rate": 0.7242022847307764,
+   "compute_multiplier": 1.1013106988218018,
+   "e": 0.19133322074189263,
+   "e_by_repo": {
+    "billflow": 0.1961193907583923,
+    "slugkit": 0.1856099301697477
+   },
+   "e_early": 0.20703529333199772,
+   "e_late": 0.17029636533084808,
+   "e_requests": 0.3072289156626506,
+   "executed": true,
+   "leaked_canaries": 4,
+   "ledger_counterfactual_usd": 0.20873455,
+   "ledger_multiplier": 1.1995344094285751,
+   "masked_spans": 13,
+   "origin_violations": 0,
+   "paid_usd": 0.174012974,
+   "pass_rate": 1.0,
+   "pass_rate_early": 1.0,
+   "pass_rate_late": 1.0,
+   "passed": 37,
+   "recalls": 0,
+   "requests": 166,
+   "review_decisions": 0,
+   "rules_learned": 0,
+   "tasks": 37,
+   "tasks_with_violation": 3,
+   "title": "3. Compute Mint (lanes + masking + origin)",
+   "tokens_cached": 214592,
+   "tokens_prompt": 296315,
+   "tokens_total": 313819,
+   "violating_requests": 3,
+   "violation_incidents": 8,
+   "violations": 8
+  },
+  "mint_broker": {
+   "arm": "mint_broker",
+   "baseline_standard_usd": 0.19164235,
+   "broker_ratio": 0.9260357143966864,
+   "cache_hit_rate": 0.713816220968777,
+   "compute_multiplier": 1.1221869795185353,
+   "e": 0.20043328626602708,
+   "e_by_repo": {
+    "billflow": 0.20061770885083408,
+    "slugkit": 0.200200751686767
+   },
+   "e_early": 0.21858145027673,
+   "e_late": 0.176556980420348,
+   "e_requests": 0.3072289156626506,
+   "executed": true,
+   "leaked_canaries": 4,
+   "ledger_counterfactual_usd": 0.20549735,
+   "ledger_multiplier": 1.2033167538154446,
+   "masked_spans": 13,
+   "origin_violations": 0,
+   "paid_usd": 0.170775774,
+   "pass_rate": 1.0,
+   "pass_rate_early": 1.0,
+   "pass_rate_late": 1.0,
+   "passed": 37,
+   "recalls": 0,
+   "requests": 166,
+   "review_decisions": 0,
+   "rules_learned": 0,
+   "tasks": 37,
+   "tasks_with_violation": 3,
+   "title": "4. Compute Mint + Context Broker",
+   "tokens_cached": 201344,
+   "tokens_prompt": 282067,
+   "tokens_total": 299571,
+   "violating_requests": 3,
+   "violation_incidents": 8,
+   "violations": 8
+  },
+  "mint_learn": {
+   "arm": "mint_learn",
+   "baseline_standard_usd": 0.19164235,
+   "broker_ratio": 0.9260016848885393,
+   "cache_hit_rate": 0.7243407686334578,
+   "compute_multiplier": 1.6729828473172899,
+   "e": 0.5220059225527738,
+   "e_by_repo": {
+    "billflow": 0.44578551286886864,
+    "slugkit": 0.6180887835655311
+   },
+   "e_early": 0.5560354452396902,
+   "e_late": 0.47723706080166983,
+   "e_requests": 0.608433734939759,
+   "executed": true,
+   "leaked_canaries": 4,
+   "ledger_counterfactual_usd": 0.20219945,
+   "ledger_multiplier": 1.7651433077656897,
+   "masked_spans": 47,
+   "origin_violations": 0,
+   "paid_usd": 0.114551294,
+   "pass_rate": 1.0,
+   "pass_rate_early": 1.0,
+   "pass_rate_late": 1.0,
+   "passed": 37,
+   "recalls": 0,
+   "requests": 166,
+   "review_decisions": 20,
+   "rules_learned": 20,
+   "tasks": 37,
+   "tasks_with_violation": 3,
+   "title": "5. Mint + Broker + rule learning",
+   "tokens_cached": 204288,
+   "tokens_prompt": 282033,
+   "tokens_total": 299533,
+   "violating_requests": 12,
+   "violation_incidents": 8,
+   "violations": 32
+  },
+  "mint_strict": {
+   "arm": "mint_strict",
+   "baseline_standard_usd": 0.19164235,
+   "broker_ratio": 0.9260444466537628,
+   "cache_hit_rate": 0.7253673668350616,
+   "compute_multiplier": 1.1473886875688017,
+   "e": 0.20863556705332553,
+   "e_by_repo": {
+    "billflow": 0.1698299545707565,
+    "slugkit": 0.2575659235332297
+   },
+   "e_early": 0.20666235826332177,
+   "e_late": 0.21123178603177056,
+   "e_requests": 0.3192771084337349,
+   "executed": true,
+   "leaked_canaries": 0,
+   "ledger_counterfactual_usd": 0.20189995,
+   "ledger_multiplier": 1.2088023270989252,
+   "masked_spans": 3,
+   "origin_violations": 0,
+   "paid_usd": 0.167024786,
+   "pass_rate": 1.0,
+   "pass_rate_early": 1.0,
+   "pass_rate_late": 1.0,
+   "passed": 37,
+   "recalls": 0,
+   "requests": 166,
+   "review_decisions": 20,
+   "rules_learned": 20,
+   "tasks": 37,
+   "tasks_with_violation": 0,
+   "title": "7. Arm 5 + distrust tool output without a file (what-if, extra)",
+   "tokens_cached": 204608,
+   "tokens_prompt": 282075,
+   "tokens_total": 299575,
+   "violating_requests": 0,
+   "violation_incidents": 0,
+   "violations": 0
+  },
+  "naive": {
+   "arm": "naive",
+   "baseline_standard_usd": 0.19164235,
+   "e": 0.3782194875585905,
+   "e_by_repo": {
+    "billflow": 0.20347779279516479,
+    "slugkit": 0.5871898571208665
+   },
+   "e_early": 0.45937719112753334,
+   "e_late": 0.26948683729842166,
+   "e_requests": 0.572289156626506,
+   "e_unchecked": 0.7234435094047433,
+   "executed": false,
+   "hypothetical_cost_usd": 0.096524024,
+   "leaked_canaries": 43,
+   "note": "simulated from recorded histories; nothing was sent anywhere",
+   "origin_violations": 12,
+   "pass_rate": null,
+   "pass_rate_early": null,
+   "pass_rate_late": null,
+   "passed": null,
+   "requests": 166,
+   "tasks": 37,
+   "tasks_with_violation": 18,
+   "title": "2. Naive mid-session switch (simulated only)",
+   "tokens_total": 313831,
+   "violating_requests": 44,
+   "violation_incidents": 96,
+   "violations": 207
+  },
+  "oracle": {
+   "arm": "oracle",
+   "baseline_standard_usd": 0.19164235,
+   "broker_ratio": 0.9259966237747194,
+   "cache_hit_rate": 0.7300371599580178,
+   "compute_multiplier": 2.272521803502605,
+   "e": 0.6728041826364498,
+   "e_by_repo": {
+    "billflow": 0.5587585538013902,
+    "slugkit": 0.8165789890786683
+   },
+   "e_early": 0.7364081891688605,
+   "e_late": 0.589123913782973,
+   "e_requests": 0.7409638554216867,
+   "executed": true,
+   "leaked_canaries": 4,
+   "ledger_counterfactual_usd": 0.2004282,
+   "ledger_multiplier": 2.376705642238163,
+   "masked_spans": 52,
+   "origin_violations": 0,
+   "paid_usd": 0.084330258,
+   "pass_rate": 1.0,
+   "pass_rate_early": 1.0,
+   "pass_rate_late": 1.0,
+   "passed": 37,
+   "recalls": 0,
+   "requests": 166,
+   "review_decisions": 0,
+   "rules_learned": 86,
+   "tasks": 37,
+   "tasks_with_violation": 3,
+   "title": "6. Mint + Broker + oracle rules (ceiling, extra)",
+   "tokens_cached": 205888,
+   "tokens_prompt": 282024,
+   "tokens_total": 299524,
+   "violating_requests": 12,
+   "violation_incidents": 8,
+   "violations": 32
+  },
+  "standard": {
+   "arm": "standard",
+   "baseline_standard_usd": 0.19164235,
+   "broker_ratio": 1.0,
+   "cache_hit_rate": 0.7766555190718362,
+   "compute_multiplier": 1.0,
+   "e": 0.0,
+   "e_by_repo": {
+    "billflow": 0.0,
+    "slugkit": 0.0
+   },
+   "e_early": 0.0,
+   "e_late": 0.0,
+   "e_requests": 0.0,
+   "executed": true,
+   "leaked_canaries": 0,
+   "ledger_counterfactual_usd": 0.19164235,
+   "ledger_multiplier": 1.0,
+   "masked_spans": 0,
+   "origin_violations": 0,
+   "paid_usd": 0.19164235,
+   "pass_rate": 1.0,
+   "pass_rate_early": 1.0,
+   "pass_rate_late": 1.0,
+   "passed": 37,
+   "recalls": 0,
+   "requests": 166,
+   "review_decisions": 0,
+   "rules_learned": 0,
+   "tasks": 37,
+   "tasks_with_violation": 0,
+   "title": "1. All Standard (no Mint)",
+   "tokens_cached": 230144,
+   "tokens_prompt": 296327,
+   "tokens_total": 313831,
+   "violating_requests": 0,
+   "violation_incidents": 0,
+   "violations": 0
+  }
+ },
+ "violations": {
+  "mint": [
+   {
+    "canary": "cust-quillfeather",
+    "kind": "customer_name",
+    "label": "CONFIDENTIAL",
+    "request_seq": 1,
+    "task_id": "T14-notify-singular-day",
+    "where": "tool: run_tests(tests/test_notify.py) (message 3)"
+   },
+   {
+    "canary": "person-ines",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 1,
+    "task_id": "T14-notify-singular-day",
+    "where": "tool: run_tests(tests/test_notify.py) (message 3)"
+   },
+   {
+    "canary": "person-sunny",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 1,
+    "task_id": "T14-notify-singular-day",
+    "where": "tool: run_tests(tests/test_notify.py) (message 3)"
+   },
+   {
+    "canary": "cust-marrowgate",
+    "kind": "customer_name",
+    "label": "CONFIDENTIAL",
+    "request_seq": 1,
+    "task_id": "T20-exporter-quoting",
+    "where": "tool: run_tests(tests/test_exporter.py) (message 3)"
+   },
+   {
+    "canary": "person-ines",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 1,
+    "task_id": "T20-exporter-quoting",
+    "where": "tool: run_tests(tests/test_exporter.py) (message 3)"
+   },
+   {
+    "canary": "person-sunny",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 1,
+    "task_id": "T20-exporter-quoting",
+    "where": "tool: run_tests(tests/test_exporter.py) (message 3)"
+   },
+   {
+    "canary": "person-ines",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 1,
+    "task_id": "T26-clients-find-case",
+    "where": "tool: run_tests(tests/test_clients.py) (message 3)"
+   },
+   {
+    "canary": "person-sunny",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 1,
+    "task_id": "T26-clients-find-case",
+    "where": "tool: run_tests(tests/test_clients.py) (message 3)"
+   }
+  ],
+  "mint_broker": [
+   {
+    "canary": "cust-quillfeather",
+    "kind": "customer_name",
+    "label": "CONFIDENTIAL",
+    "request_seq": 1,
+    "task_id": "T14-notify-singular-day",
+    "where": "tool: run_tests(tests/test_notify.py) (message 3)"
+   },
+   {
+    "canary": "person-ines",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 1,
+    "task_id": "T14-notify-singular-day",
+    "where": "tool: run_tests(tests/test_notify.py) (message 3)"
+   },
+   {
+    "canary": "person-sunny",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 1,
+    "task_id": "T14-notify-singular-day",
+    "where": "tool: run_tests(tests/test_notify.py) (message 3)"
+   },
+   {
+    "canary": "cust-marrowgate",
+    "kind": "customer_name",
+    "label": "CONFIDENTIAL",
+    "request_seq": 1,
+    "task_id": "T20-exporter-quoting",
+    "where": "tool: run_tests(tests/test_exporter.py) (message 3)"
+   },
+   {
+    "canary": "person-ines",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 1,
+    "task_id": "T20-exporter-quoting",
+    "where": "tool: run_tests(tests/test_exporter.py) (message 3)"
+   },
+   {
+    "canary": "person-sunny",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 1,
+    "task_id": "T20-exporter-quoting",
+    "where": "tool: run_tests(tests/test_exporter.py) (message 3)"
+   },
+   {
+    "canary": "person-ines",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 1,
+    "task_id": "T26-clients-find-case",
+    "where": "tool: run_tests(tests/test_clients.py) (message 3)"
+   },
+   {
+    "canary": "person-sunny",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 1,
+    "task_id": "T26-clients-find-case",
+    "where": "tool: run_tests(tests/test_clients.py) (message 3)"
+   }
+  ],
+  "mint_learn": [
+   {
+    "canary": "cust-quillfeather",
+    "kind": "customer_name",
+    "label": "CONFIDENTIAL",
+    "request_seq": 1,
+    "task_id": "T14-notify-singular-day",
+    "where": "tool: run_tests(tests/test_notify.py) (message 3)"
+   },
+   {
+    "canary": "person-ines",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 1,
+    "task_id": "T14-notify-singular-day",
+    "where": "tool: run_tests(tests/test_notify.py) (message 3)"
+   },
+   {
+    "canary": "person-sunny",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 1,
+    "task_id": "T14-notify-singular-day",
+    "where": "tool: run_tests(tests/test_notify.py) (message 3)"
+   },
+   {
+    "canary": "cust-quillfeather",
+    "kind": "customer_name",
+    "label": "CONFIDENTIAL",
+    "request_seq": 2,
+    "task_id": "T14-notify-singular-day",
+    "where": "tool: run_tests(tests/test_notify.py) (message 3)"
+   },
+   {
+    "canary": "person-ines",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 2,
+    "task_id": "T14-notify-singular-day",
+    "where": "tool: run_tests(tests/test_notify.py) (message 3)"
+   },
+   {
+    "canary": "person-sunny",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 2,
+    "task_id": "T14-notify-singular-day",
+    "where": "tool: run_tests(tests/test_notify.py) (message 3)"
+   },
+   {
+    "canary": "cust-quillfeather",
+    "kind": "customer_name",
+    "label": "CONFIDENTIAL",
+    "request_seq": 3,
+    "task_id": "T14-notify-singular-day",
+    "where": "tool: run_tests(tests/test_notify.py) (message 3)"
+   },
+   {
+    "canary": "person-ines",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 3,
+    "task_id": "T14-notify-singular-day",
+    "where": "tool: run_tests(tests/test_notify.py) (message 3)"
+   },
+   {
+    "canary": "person-sunny",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 3,
+    "task_id": "T14-notify-singular-day",
+    "where": "tool: run_tests(tests/test_notify.py) (message 3)"
+   },
+   {
+    "canary": "cust-quillfeather",
+    "kind": "customer_name",
+    "label": "CONFIDENTIAL",
+    "request_seq": 4,
+    "task_id": "T14-notify-singular-day",
+    "where": "tool: run_tests(tests/test_notify.py) (message 3)"
+   },
+   {
+    "canary": "person-ines",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 4,
+    "task_id": "T14-notify-singular-day",
+    "where": "tool: run_tests(tests/test_notify.py) (message 3)"
+   },
+   {
+    "canary": "person-sunny",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 4,
+    "task_id": "T14-notify-singular-day",
+    "where": "tool: run_tests(tests/test_notify.py) (message 3)"
+   },
+   {
+    "canary": "cust-marrowgate",
+    "kind": "customer_name",
+    "label": "CONFIDENTIAL",
+    "request_seq": 1,
+    "task_id": "T20-exporter-quoting",
+    "where": "tool: run_tests(tests/test_exporter.py) (message 3)"
+   },
+   {
+    "canary": "person-ines",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 1,
+    "task_id": "T20-exporter-quoting",
+    "where": "tool: run_tests(tests/test_exporter.py) (message 3)"
+   },
+   {
+    "canary": "person-sunny",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 1,
+    "task_id": "T20-exporter-quoting",
+    "where": "tool: run_tests(tests/test_exporter.py) (message 3)"
+   },
+   {
+    "canary": "cust-marrowgate",
+    "kind": "customer_name",
+    "label": "CONFIDENTIAL",
+    "request_seq": 2,
+    "task_id": "T20-exporter-quoting",
+    "where": "tool: run_tests(tests/test_exporter.py) (message 3)"
+   },
+   {
+    "canary": "person-ines",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 2,
+    "task_id": "T20-exporter-quoting",
+    "where": "tool: run_tests(tests/test_exporter.py) (message 3)"
+   },
+   {
+    "canary": "person-sunny",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 2,
+    "task_id": "T20-exporter-quoting",
+    "where": "tool: run_tests(tests/test_exporter.py) (message 3)"
+   },
+   {
+    "canary": "cust-marrowgate",
+    "kind": "customer_name",
+    "label": "CONFIDENTIAL",
+    "request_seq": 3,
+    "task_id": "T20-exporter-quoting",
+    "where": "tool: run_tests(tests/test_exporter.py) (message 3)"
+   },
+   {
+    "canary": "person-ines",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 3,
+    "task_id": "T20-exporter-quoting",
+    "where": "tool: run_tests(tests/test_exporter.py) (message 3)"
+   },
+   {
+    "canary": "person-sunny",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 3,
+    "task_id": "T20-exporter-quoting",
+    "where": "tool: run_tests(tests/test_exporter.py) (message 3)"
+   },
+   {
+    "canary": "cust-marrowgate",
+    "kind": "customer_name",
+    "label": "CONFIDENTIAL",
+    "request_seq": 4,
+    "task_id": "T20-exporter-quoting",
+    "where": "tool: run_tests(tests/test_exporter.py) (message 3)"
+   },
+   {
+    "canary": "person-ines",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 4,
+    "task_id": "T20-exporter-quoting",
+    "where": "tool: run_tests(tests/test_exporter.py) (message 3)"
+   },
+   {
+    "canary": "person-sunny",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 4,
+    "task_id": "T20-exporter-quoting",
+    "where": "tool: run_tests(tests/test_exporter.py) (message 3)"
+   },
+   {
+    "canary": "person-ines",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 1,
+    "task_id": "T26-clients-find-case",
+    "where": "tool: run_tests(tests/test_clients.py) (message 3)"
+   },
+   {
+    "canary": "person-sunny",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 1,
+    "task_id": "T26-clients-find-case",
+    "where": "tool: run_tests(tests/test_clients.py) (message 3)"
+   },
+   {
+    "canary": "person-ines",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 2,
+    "task_id": "T26-clients-find-case",
+    "where": "tool: run_tests(tests/test_clients.py) (message 3)"
+   },
+   {
+    "canary": "person-sunny",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 2,
+    "task_id": "T26-clients-find-case",
+    "where": "tool: run_tests(tests/test_clients.py) (message 3)"
+   },
+   {
+    "canary": "person-ines",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 3,
+    "task_id": "T26-clients-find-case",
+    "where": "tool: run_tests(tests/test_clients.py) (message 3)"
+   },
+   {
+    "canary": "person-sunny",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 3,
+    "task_id": "T26-clients-find-case",
+    "where": "tool: run_tests(tests/test_clients.py) (message 3)"
+   },
+   {
+    "canary": "person-ines",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 4,
+    "task_id": "T26-clients-find-case",
+    "where": "tool: run_tests(tests/test_clients.py) (message 3)"
+   },
+   {
+    "canary": "person-sunny",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 4,
+    "task_id": "T26-clients-find-case",
+    "where": "tool: run_tests(tests/test_clients.py) (message 3)"
+   }
+  ],
+  "oracle": [
+   {
+    "canary": "cust-quillfeather",
+    "kind": "customer_name",
+    "label": "CONFIDENTIAL",
+    "request_seq": 1,
+    "task_id": "T14-notify-singular-day",
+    "where": "tool: run_tests(tests/test_notify.py) (message 3)"
+   },
+   {
+    "canary": "person-ines",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 1,
+    "task_id": "T14-notify-singular-day",
+    "where": "tool: run_tests(tests/test_notify.py) (message 3)"
+   },
+   {
+    "canary": "person-sunny",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 1,
+    "task_id": "T14-notify-singular-day",
+    "where": "tool: run_tests(tests/test_notify.py) (message 3)"
+   },
+   {
+    "canary": "cust-quillfeather",
+    "kind": "customer_name",
+    "label": "CONFIDENTIAL",
+    "request_seq": 2,
+    "task_id": "T14-notify-singular-day",
+    "where": "tool: run_tests(tests/test_notify.py) (message 3)"
+   },
+   {
+    "canary": "person-ines",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 2,
+    "task_id": "T14-notify-singular-day",
+    "where": "tool: run_tests(tests/test_notify.py) (message 3)"
+   },
+   {
+    "canary": "person-sunny",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 2,
+    "task_id": "T14-notify-singular-day",
+    "where": "tool: run_tests(tests/test_notify.py) (message 3)"
+   },
+   {
+    "canary": "cust-quillfeather",
+    "kind": "customer_name",
+    "label": "CONFIDENTIAL",
+    "request_seq": 3,
+    "task_id": "T14-notify-singular-day",
+    "where": "tool: run_tests(tests/test_notify.py) (message 3)"
+   },
+   {
+    "canary": "person-ines",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 3,
+    "task_id": "T14-notify-singular-day",
+    "where": "tool: run_tests(tests/test_notify.py) (message 3)"
+   },
+   {
+    "canary": "person-sunny",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 3,
+    "task_id": "T14-notify-singular-day",
+    "where": "tool: run_tests(tests/test_notify.py) (message 3)"
+   },
+   {
+    "canary": "cust-quillfeather",
+    "kind": "customer_name",
+    "label": "CONFIDENTIAL",
+    "request_seq": 4,
+    "task_id": "T14-notify-singular-day",
+    "where": "tool: run_tests(tests/test_notify.py) (message 3)"
+   },
+   {
+    "canary": "person-ines",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 4,
+    "task_id": "T14-notify-singular-day",
+    "where": "tool: run_tests(tests/test_notify.py) (message 3)"
+   },
+   {
+    "canary": "person-sunny",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 4,
+    "task_id": "T14-notify-singular-day",
+    "where": "tool: run_tests(tests/test_notify.py) (message 3)"
+   },
+   {
+    "canary": "cust-marrowgate",
+    "kind": "customer_name",
+    "label": "CONFIDENTIAL",
+    "request_seq": 1,
+    "task_id": "T20-exporter-quoting",
+    "where": "tool: run_tests(tests/test_exporter.py) (message 3)"
+   },
+   {
+    "canary": "person-ines",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 1,
+    "task_id": "T20-exporter-quoting",
+    "where": "tool: run_tests(tests/test_exporter.py) (message 3)"
+   },
+   {
+    "canary": "person-sunny",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 1,
+    "task_id": "T20-exporter-quoting",
+    "where": "tool: run_tests(tests/test_exporter.py) (message 3)"
+   },
+   {
+    "canary": "cust-marrowgate",
+    "kind": "customer_name",
+    "label": "CONFIDENTIAL",
+    "request_seq": 2,
+    "task_id": "T20-exporter-quoting",
+    "where": "tool: run_tests(tests/test_exporter.py) (message 3)"
+   },
+   {
+    "canary": "person-ines",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 2,
+    "task_id": "T20-exporter-quoting",
+    "where": "tool: run_tests(tests/test_exporter.py) (message 3)"
+   },
+   {
+    "canary": "person-sunny",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 2,
+    "task_id": "T20-exporter-quoting",
+    "where": "tool: run_tests(tests/test_exporter.py) (message 3)"
+   },
+   {
+    "canary": "cust-marrowgate",
+    "kind": "customer_name",
+    "label": "CONFIDENTIAL",
+    "request_seq": 3,
+    "task_id": "T20-exporter-quoting",
+    "where": "tool: run_tests(tests/test_exporter.py) (message 3)"
+   },
+   {
+    "canary": "person-ines",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 3,
+    "task_id": "T20-exporter-quoting",
+    "where": "tool: run_tests(tests/test_exporter.py) (message 3)"
+   },
+   {
+    "canary": "person-sunny",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 3,
+    "task_id": "T20-exporter-quoting",
+    "where": "tool: run_tests(tests/test_exporter.py) (message 3)"
+   },
+   {
+    "canary": "cust-marrowgate",
+    "kind": "customer_name",
+    "label": "CONFIDENTIAL",
+    "request_seq": 4,
+    "task_id": "T20-exporter-quoting",
+    "where": "tool: run_tests(tests/test_exporter.py) (message 3)"
+   },
+   {
+    "canary": "person-ines",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 4,
+    "task_id": "T20-exporter-quoting",
+    "where": "tool: run_tests(tests/test_exporter.py) (message 3)"
+   },
+   {
+    "canary": "person-sunny",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 4,
+    "task_id": "T20-exporter-quoting",
+    "where": "tool: run_tests(tests/test_exporter.py) (message 3)"
+   },
+   {
+    "canary": "person-ines",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 1,
+    "task_id": "T26-clients-find-case",
+    "where": "tool: run_tests(tests/test_clients.py) (message 3)"
+   },
+   {
+    "canary": "person-sunny",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 1,
+    "task_id": "T26-clients-find-case",
+    "where": "tool: run_tests(tests/test_clients.py) (message 3)"
+   },
+   {
+    "canary": "person-ines",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 2,
+    "task_id": "T26-clients-find-case",
+    "where": "tool: run_tests(tests/test_clients.py) (message 3)"
+   },
+   {
+    "canary": "person-sunny",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 2,
+    "task_id": "T26-clients-find-case",
+    "where": "tool: run_tests(tests/test_clients.py) (message 3)"
+   },
+   {
+    "canary": "person-ines",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 3,
+    "task_id": "T26-clients-find-case",
+    "where": "tool: run_tests(tests/test_clients.py) (message 3)"
+   },
+   {
+    "canary": "person-sunny",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 3,
+    "task_id": "T26-clients-find-case",
+    "where": "tool: run_tests(tests/test_clients.py) (message 3)"
+   },
+   {
+    "canary": "person-ines",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 4,
+    "task_id": "T26-clients-find-case",
+    "where": "tool: run_tests(tests/test_clients.py) (message 3)"
+   },
+   {
+    "canary": "person-sunny",
+    "kind": "person_name",
+    "label": "FLOOR",
+    "request_seq": 4,
+    "task_id": "T26-clients-find-case",
+    "where": "tool: run_tests(tests/test_clients.py) (message 3)"
+   }
+  ]
+ }
+}

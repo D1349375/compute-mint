@@ -68,3 +68,34 @@ def test_report_files(tmp_path):
     md = summary_markdown(results)
     assert "| 3. Mint |" in md and "No canary reached a Contributor request" in md
     assert pct(0.1234) == "12.3%" and pct(None) == "n/a"
+
+
+def _results_with(reasons, e_contributor=500, violations=0):
+    t = task(0, "early", 1000, e_contributor, violations=violations)
+    t["per_request"] = [{"lane": lane, "reason": reason, "prompt": 0, "cached": 0, "completion": 0, "masked": 0}
+                        for lane, reason in reasons]
+    a = arm([t])
+    return {"options": {"upstream": "mock", "reviews_per_task": 2, "reviewer_error_rate": 0.0, "cache_block_tokens": 64},
+            "tasks": [{"id": t["task_id"], "index": 0, "phase": "early", "repo": "slugkit"}],
+            "arms": {"mint": a}, "summaries": {"mint": summarize(a, 0.04)}}
+
+
+def test_before_after_table_compares_arms_that_exist_in_both_runs():
+    before = _results_with([("standard", "1 message(s) not contributable")], e_contributor=800, violations=8)
+    after = _results_with([("standard", "1 message(s) not contributable [fingerprint]")], e_contributor=500)
+    md = summary_markdown(after, before)
+    assert "## Before and after the leak fix" in md
+    assert "80.0% → 50.0%" in md and "8 → **0**" in md
+    assert "## Before and after" not in summary_markdown(after)
+
+
+def test_cause_table_counts_standard_requests_by_the_mechanism_in_the_reason():
+    results = _results_with([("standard", "2 message(s) not contributable [output-path]"),
+                             ("standard", "1 message(s) not contributable [fingerprint]"),
+                             ("standard", "1 message(s) not contributable [fingerprint, output-path]"),
+                             ("standard", "1 message(s) not contributable"),
+                             ("contributor", "all context contributable after masking")])
+    md = summary_markdown(results)
+    assert "## Why requests stayed on Standard" in md
+    assert "| 3. Mint | 4 | 1 | 1 | 1 | 1 |" in md
+    assert "Why requests stayed" not in summary_markdown(_results_with([("standard", "1 message(s) not contributable")]))
