@@ -62,7 +62,57 @@ def _violation_sources(arm: dict) -> Counter:
     return c
 
 
-def summary_markdown(results: dict) -> str:
+def _cause_counts(arm: dict) -> Counter:
+    """Standard requests by the cause tags the gateway put into the routing reason, e.g. `[fingerprint, output-path]`."""
+    c: Counter = Counter()
+    for t in arm["tasks"]:
+        for r in t.get("per_request", []):
+            if r["lane"] != "standard":
+                continue
+            reason = r["reason"]
+            tags = tuple(reason[reason.index("[") + 1:reason.rindex("]")].split(", ")) if reason.endswith("]") and "[" in reason else ()
+            c[tags] += 1
+    return c
+
+
+def comparison_markdown(results: dict, before: dict) -> list[str]:
+    """Before/after table against an earlier run's summaries (`results.json`, or its slim `summary.json`)."""
+    rows = []
+    for name, now in results["summaries"].items():
+        old = before["summaries"].get(name)
+        if old is None or not now["executed"] or not old["executed"]:
+            continue
+        rows.append(f"| {now['title']} | {old['passed']}/{old['tasks']} → {now['passed']}/{now['tasks']} | "
+                    f"{pct(old['e'])} → {pct(now['e'])} | {mult(old['compute_multiplier'])} → {mult(now['compute_multiplier'])} | "
+                    f"{old['violations']} → **{now['violations']}** | {old['origin_violations']} → {now['origin_violations']} |")
+    if not rows:
+        return []
+    return ["## Before and after the leak fix", "",
+            "Before = the reference run made with the gateway that labeled a tool output only by the file path in the tool "
+            "call (`sample_results/before-leak-fix/`). After = this run: output labeled also by the paths it prints and by "
+            "fingerprints of sensitive text read earlier.", "",
+            "| Arm | Acceptance | e | Compute multiplier | Canary violations | Origin violations |", "|---|---|---|---|---|---|",
+            *rows, ""]
+
+
+def causes_markdown(results: dict) -> list[str]:
+    rows = []
+    for name, arm in results["arms"].items():
+        if not ARM_SPECS[name].executed or ARM_SPECS[name].all_standard:
+            continue
+        c = _cause_counts(arm)
+        total = sum(c.values())
+        only_path, only_fp, both = c[("output-path",)], c[("fingerprint",)], c[("fingerprint", "output-path")]
+        rows.append(f"| {results['summaries'][name]['title']} | {total} | {only_path} | {only_fp} | {both} | {total - only_path - only_fp - both} |")
+    if not any(r.split("|")[3].strip() != "0" or r.split("|")[4].strip() != "0" or r.split("|")[5].strip() != "0" for r in rows):
+        return []
+    return ["## Why requests stayed on Standard", "",
+            "Requests served by Standard, by the mechanism the gateway named in its routing reason (a request can be held back "
+            "by several messages; \"other\" is path rules, detected secrets and origin).", "",
+            "| Arm | Standard requests | output path only | fingerprint only | both | other |", "|---|---|---|---|---|---|", *rows, ""]
+
+
+def summary_markdown(results: dict, before: dict | None = None) -> str:
     s = results["summaries"]
     o = results["options"]
     n_tasks = len(results["tasks"])
@@ -117,6 +167,10 @@ def summary_markdown(results: dict) -> str:
     for name, row in s.items():
         lines.append(f"| {row['title']} | {pct(row['e_by_repo'].get('slugkit'))} | {pct(row['e_by_repo'].get('billflow'))} |")
     lines.append("")
+
+    if before is not None:
+        lines += comparison_markdown(results, before)
+    lines += causes_markdown(results)
 
     if "naive_variants" in results:
         lines += ["## Naive switch: when is the model flipped?", "",

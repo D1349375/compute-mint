@@ -78,6 +78,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--cache-block", type=int, default=64, help="prompt-cache granularity in tokens (mock upstream)")
     p.add_argument("--naive-switch", default="mid", choices=["start", "mid", "late"])
     p.add_argument("--seed", type=int, default=1)
+    p.add_argument("--compare", default="", help="results.json or summary.json of an earlier run: adds a before/after table")
     args = p.parse_args(argv)
 
     if args.upstream == "meta":
@@ -93,7 +94,8 @@ def main(argv: list[str] | None = None) -> int:
     out_dir.mkdir(parents=True, exist_ok=True)
     write_json(out_dir / "results.json", results)
     write_tables(out_dir, results)
-    (out_dir / "summary.md").write_text(summary_markdown(results), encoding="utf-8", newline="\n")
+    before = json.loads(Path(args.compare).read_text(encoding="utf-8")) if args.compare else None
+    (out_dir / "summary.md").write_text(summary_markdown(results, before), encoding="utf-8", newline="\n")
     write_json(out_dir / "meta.json", {"generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
                                        "python": sys.version.split()[0], "command": " ".join(sys.argv[1:] if argv is None else argv)})
     print((out_dir / "summary.md").read_text(encoding="utf-8"))

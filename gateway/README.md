@@ -17,6 +17,7 @@ Point an agent at `http://localhost:8787/v1`. Per-request headers:
 | `x-cm-project` | `public`, `own_ip`, `confidential` | baseline label of this project's content |
 | `x-cm-dial` | `public`, `own_ip` | strictest label the user agrees to contribute |
 | `x-cm-client` | `anthropic`, `openai`, `unknown` | model behind the calling agent; labels the agent's own assistant messages with that origin |
+| `x-cm-root` | absolute path | the agent's working directory; places the relative paths printed in tool output. Optional: the system prompt (or first user message) is searched for `working directory: …`, `repository root is …`, `<cwd>…</cwd>`, and a tool call's own `cwd`/`workdir` argument wins |
 
 `GET /v1/ledger/summary` returns spend, counterfactual spend, savings, the contributable token share, the cache hit rate and the Context Broker's context ratio.
 
@@ -31,7 +32,9 @@ Point an agent at `http://localhost:8787/v1`. Per-request headers:
 | `context.py` | taint tracking; provenance of gateway-generated replies |
 | `router.py` | lane decision and clean-context assembly |
 | `broker.py` | cache-aware Context Broker: compacts aged tool outputs once, memoized, so the cached prefix keeps matching |
-| `policy.py` | learned path rules and the review queue; credential files are always FLOOR |
+| `policy.py` | learned path rules and the review queue; credential files are always FLOOR; labels tool output that names no file (below) |
+| `outpaths.py` | file paths in free text: tracebacks, `path:line`, pytest ids, compiler output, shell commands |
+| `fingerprint.py` | content fingerprints of sensitive text read earlier (in-memory, keyed hashes) |
 | `pricing.py`, `ledger.py` | official prices and the counterfactual ledger |
 | `app.py` | the proxy |
 | `memory.py` | personal memory in SQLite (preferences, project facts, accepted plans), each with origin and label |
@@ -39,6 +42,52 @@ Point an agent at `http://localhost:8787/v1`. Per-request headers:
 | `mcp_server.py` | MCP server (stdio): `delegate`, `recall`, `quota` |
 | `quota.py` | read-only Codex `rate_limits` from local session logs |
 | `project_card.py` | generated block in `AGENTS.md` / `CLAUDE.md` from memory |
+
+## Tool output that names no file
+
+A tool message is labeled by the file path in its call (`read_file(path)`), through the learned rules. Output that is
+not one file's content (a test run, a shell command) used to get the project default, so a failing test that printed
+customer names went to Contributor: names are not detectable, and nothing in the call said where they came from. Two
+deterministic mechanisms now label such output; the strictest label wins (`Config(output_paths=False,
+fingerprints=False)` turns them off, which the bench uses as its "before").
+
+**1. Paths printed in the output and named by the command.** `outpaths.py` finds Python `File "…"` lines,
+`path:line[:col]` (also grep's `path:line:text`), pytest `path::test`, compiler/linter output, absolute POSIX and
+Windows paths, `./x`, `dir/file.ext`, git diff headers, and in the call's `command`/`cmd`/`script`/`args`/`argv`/`target`
+arguments also bare file names. Each is judged like a tool-call path: the strictest matching rule, and **no rule means
+CONFIDENTIAL** until reviewed (and the path joins the review queue). A relative path is placed with the call's
+`cwd`/`workdir`, else `x-cm-root`, else the root the system prompt states, else a path already seen in the session or
+the review queue; if none works it is treated as unreviewed. Library frames (`site-packages`, `node_modules`,
+`/usr/lib`, …) are ignored, and a bare `main.py` counts only with a line number or in a command. A file *read* is not
+affected: its label is the file's, whatever paths its text mentions.
+
+**2. Content fingerprints.** Whenever the gateway sees the content of a file (or of a file named in a command) whose
+label is CONFIDENTIAL or stricter (unreviewed counts), it remembers distinctive *terms* of that text, per source file:
+
+| Term | Example | Weight |
+|---|---|---|
+| unusual word: 8+ letters, not in `common_words.txt` | a company name | 2 |
+| identifier of 6+ characters with 3+ digits | a tax number | 2 |
+| decimal with 4+ places | a negotiated rate | 2 |
+| two consecutive capitalized words, one of them not common | a person's name | 2 |
+| capitalized unusual 5-7 letter word, 6+ digit string, 3-place decimal | a first name | 1 |
+
+Source code (by extension) contributes only its string literals and numeric constants, since identifiers are shared
+between files and say nothing about sensitivity. Later, a tool message that is not a named file's content (and a
+user message after the first) whose terms score 2 or more takes the source's label. Hits are resolved against the
+source's **current** label at lookup time: a file the user later reviews as public or OWN_IP stops protecting
+anything, and a file reviewed after the fact is never remembered. Words that appear in the system prompt or the first
+user message are exempt (the project's own name, or a name the user typed). The index lives in process memory only,
+holds keyed 64-bit hashes (the key is random per process), is not persisted, logged, put in the ledger or sent.
+It is gateway-wide: names read in one session protect the output of another.
+
+`Decision.reason` (ledger) names the mechanism, e.g. `1 message(s) not contributable [fingerprint, output-path]`.
+
+Limits: the first sight of a name is not protected (a test that prints names nobody read through the gateway before,
+for instance data that lives only in a fixture or generator the agent never opened); paraphrases and translations are
+not matched; text that is sensitive only in context is not matched (that needs a semantic judge); a name that is
+also an ordinary word is a false-positive risk, a short or common one a miss; output paths with spaces are not
+found; the fingerprint score is a heuristic whose cost is measured in `bench/` (`README.md` there).
 
 ## Origin: which content may go to Contributor
 

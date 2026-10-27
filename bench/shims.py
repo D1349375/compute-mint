@@ -17,8 +17,8 @@ SAFE_TOOLS = frozenset({"list_files"})
 def strict_tool_outputs(policy: Policy, safe_tools: frozenset[str] = SAFE_TOOLS) -> None:
     original = policy.baseline_for
 
-    def baseline_for(messages: list[dict], default: Label, unknown_file: Label = Label.CONFIDENTIAL):
-        inner = original(messages, default, unknown_file)
+    def baseline_for(messages: list[dict], default: Label, unknown_file: Label = Label.CONFIDENTIAL, **kwargs):
+        inner = original(messages, default, unknown_file, **kwargs)
         names = {call.get("id"): (call.get("function") or {}).get("name")
                  for m in messages for call in m.get("tool_calls") or []}
         paths = tool_paths(messages)

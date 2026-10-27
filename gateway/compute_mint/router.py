@@ -79,9 +79,12 @@ def route(messages: list[dict], *, baseline: Label, dial: Label, vault: Vault, p
     if not blocked:
         return Decision(CONTRIBUTOR, masked, join(*residuals), spans,
                         reason="all context contributable after masking")
+    why = getattr(baseline_for, "why", None)
+    causes = sorted({c for i in blocked for c in (why(i) if why else ())})
     return Decision(STANDARD, [copy.deepcopy(m) for m in messages], raw_label, 0,
                     reason=f"{len(blocked)} message(s) not contributable"
-                           + (f" ({len(by_origin)} by origin)" if by_origin else ""), blocked_by=blocked)
+                           + (f" ({len(by_origin)} by origin)" if by_origin else "")
+                           + (f" [{', '.join(causes)}]" if causes else ""), blocked_by=blocked)
 
 
 def rehydrate_response(body: dict, vault: Vault) -> dict:

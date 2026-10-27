@@ -5,6 +5,8 @@ Agents point their base_url at this server. Per-request headers:
 - x-cm-project: baseline label of this project's content: public | own_ip | confidential
 - x-cm-dial:    strictest label the user agrees to contribute: public | own_ip
 - x-cm-client:  model behind the calling agent: anthropic | openai | unknown (default unknown)
+- x-cm-root:    absolute path of the agent's working directory (places relative paths in tool output;
+                optional, the system prompt is searched for it otherwise)
 """
 import os
 from dataclasses import dataclass, field
@@ -17,7 +19,7 @@ from .broker import Broker
 from .context import Provenance, fingerprint
 from .labels import Label
 from .ledger import Ledger
-from .policy import Policy
+from .policy import Policy, clean_root
 from .origin import OriginTracker, parse_client
 from .pricing import Usage
 from .router import CONTRIBUTOR, payload_digest, rehydrate_response, route
@@ -34,6 +36,9 @@ class Config:
     standard_model: str = os.environ.get("STANDARD_MODEL", "muse-spark-1.3")
     ledger_path: str = os.environ.get("LEDGER_PATH", ":memory:")
     policy_path: str = os.environ.get("POLICY_PATH", ":memory:")
+    output_paths: bool = True    # label tool output by the paths it names
+    fingerprints: bool = True    # label tool output by sensitive text read earlier
+    fingerprint_threshold: int = 2   # score a message needs (see fingerprint.py)
 
 
 @dataclass
@@ -48,7 +53,8 @@ def create_app(config: Config | None = None, transport: httpx.AsyncBaseTransport
     config = config or Config()
     app = FastAPI(title="Compute Mint gateway")
     ledger = Ledger(config.ledger_path)
-    policy = Policy(config.policy_path)
+    policy = Policy(config.policy_path, output_paths=config.output_paths, fingerprints=config.fingerprints,
+                    fingerprint_threshold=config.fingerprint_threshold)
     sessions: dict[str, SessionState] = {}
     client = httpx.AsyncClient(base_url=config.api_base, transport=transport, timeout=300,
                                headers={"Authorization": f"Bearer {config.api_key}"})
@@ -77,13 +83,14 @@ def create_app(config: Config | None = None, transport: httpx.AsyncBaseTransport
             caller = parse_client(request.headers.get("x-cm-client"))
         except ValueError as e:
             raise HTTPException(400, str(e))
+        root = clean_root(request.headers.get("x-cm-root"))
         state = sessions.setdefault(session_id, SessionState())
 
         origins = state.origin.of_messages(messages, state.provenance, caller)
         decision = route(messages, baseline=baseline, dial=dial, vault=state.vault, provenance=state.provenance,
-                         baseline_for=policy.baseline_for(messages, baseline), origins=origins)
+                         baseline_for=policy.baseline_for(messages, baseline, root=root), origins=origins)
         if decision.blocked_by:
-            policy.enqueue_unknown(messages, decision.blocked_by)
+            policy.enqueue_unknown(messages, decision.blocked_by, root=root)
         model = config.contributor_model if decision.lane == CONTRIBUTOR else config.standard_model
         sent, bstats = state.broker.apply(decision.messages)
         upstream_body = {**body, "model": model, "messages": sent}

@@ -15,7 +15,8 @@ bench under it).
 ```bash
 cd <repo>
 gateway/.venv/Scripts/python -m bench.run --arms all --upstream mock            # five arms, ~4 minutes
-gateway/.venv/Scripts/python -m bench.run --arms all,oracle,mint_strict --out bench/sample_results --run-id reference-run
+gateway/.venv/Scripts/python -m bench.run --arms all,oracle,mint_strict,learn_nofix,learn_paths,learn_fp,fp_t1,fp_t4 --out bench/sample_results --run-id reference-run --compare bench/sample_results/before-leak-fix/summary.json
+gateway/.venv/Scripts/python -m bench.fpaudit                                     # static false-positive audit of the fingerprints
 gateway/.venv/Scripts/python -m bench.run --arms standard,mint --tasks T01,T14   # a few tasks
 cd bench && ../gateway/.venv/Scripts/python -m pytest -q                         # bench tests (~4 minutes)
 ```
@@ -23,7 +24,9 @@ cd bench && ../gateway/.venv/Scripts/python -m pytest -q                        
 (`gateway/.venv` is built as described in `gateway/README.md`; use `.venv/bin/python` on Linux/macOS.)
 Output goes to `bench/results/<timestamp>/` (git-ignored): `results.json` (everything, no timestamps, byte-identical
 for the same configuration), `summary.md`, `tasks.csv`, `learning_curve.csv`, `violations.csv`, `meta.json`.
-A reference run is committed in `bench/sample_results/reference-run/`.
+A reference run is committed in `bench/sample_results/reference-run/`; `bench/sample_results/before-leak-fix/` holds the numbers and
+report of the reference run made before the gateway labeled tool output by the paths it prints and by content fingerprints
+(`--compare` turns it into the before/after table).
 
 ## What is simulated, and how
 
@@ -40,7 +43,8 @@ task script ──► scripted solver (the "model") ◄── mock upstream: tok
 - **Agent loop** (`agent.py`, `tools.py`): a minimal tool-calling loop over four tools on a throw-away copy of a
   synthetic repository. `run_tests` runs real pytest in a subprocess with a minimal environment. Tool paths are
   absolute (`/work/<repo>/...`), as in real coding agents, so a path rule learned for one repository can never
-  match another repository's file.
+  match another repository's file. Each request carries `x-cm-root: /work/<repo>`, which is how the gateway places the
+  relative paths a test run prints.
 - **Scripted solver** (`solver.py`): each task carries the script of tool calls a competent agent makes and the files
   it writes (`solutions/<task id>/`). It reads only what the gateway sent it, so Contributor requests show it
   masked text; quoted values may be placeholders that the gateway restores in the reply. If a value it needs was
@@ -139,6 +143,9 @@ compact (the solver then re-reads).
 | `mint_learn` | `mint_broker` + the review queue answered by a simulated reviewer from the truth labels (default: up to 2 decisions after each task; it generalizes a folder only if every file in it has the same answer) |
 | `oracle` (extra) | `mint_broker` with every path rule preloaded from the truth: the ceiling for learning |
 | `mint_strict` (extra) | `mint_learn` plus a **what-if shim** (`shims.py`, no gateway change): tool output that names no file is treated as unreviewed |
+| `learn_nofix` (extra) | arm 5 on the gateway as it was before the leak fix (`output_paths` and `fingerprints` off): reproduces the old arm 5 exactly |
+| `learn_paths`, `learn_fp` (extra) | arm 5 with only the paths-in-output mechanism, or only the content fingerprints (ablation) |
+| `fp_t1`, `fp_t4` (extra) | fingerprints only, with the match threshold at 1 and 4 instead of 2 (sweep) |
 
 `--arms all` is the first five. The Standard arm always runs (it is the reference). Each arm gets its own gateway
 app, ledger, policy and mock upstream, and sees the same tasks in the same order.
@@ -163,12 +170,22 @@ number of learned rules, for every arm.
 
 See `sample_results/reference-run/summary.md`. Read it with these in mind:
 
-1. **The canary check found a real gap.** The gateway labels a tool output by the file path in the tool call's
-   arguments; the output of `run_tests` (or a shell command) names no file, so it gets the project default label. When
-   a failing test prints customer names, the names go to Contributor (names are not detectable). All violations in
-   the Mint arms come from the three `leak_vector:test_output` tasks. Learning makes it worse (the lane stays
-   Contributor longer, so the same names are sent in more requests). `mint_strict` shows the price of closing it
-   crudely: no violations, but e falls from about half to about a fifth. A finer fix is for the gateway's owner to design.
+1. **The canary check found a real gap, and the gateway now closes it.** The gateway used to label a tool output only by
+   the file path in the tool call's arguments; the output of `run_tests` names no file, so it got the project default.
+   When a failing test printed customer names, the names went to Contributor (names are not detectable): 8 violations in
+   arms 3 and 4, 32 in arms 5 and 6, all from T14/T20/T26. Learning made it worse (the lane stays Contributor longer).
+   The crude fix (`mint_strict`: distrust every output without a file) gives 0 violations and e about 21%.
+   The gateway fix has two deterministic parts (see `gateway/README.md`): paths printed in the output or named by the
+   command are judged by the rules, unreviewed meaning CONFIDENTIAL; and content fingerprints of sensitive text read
+   earlier label later output that repeats it. Result in `sample_results/reference-run/summary.md` ("Before and after"):
+   0 violations in every Mint arm, 37/37 accepted, and arm 5 keeps e = 48.5% (was 52.2%, of which 6.9 points were the
+   leaking requests; the ablation `learn_fp` shows fingerprints alone cost exactly those three tasks and nothing else).
+   Paths alone (`learn_paths`) are not enough once the test directory has been reviewed as OWN_IP (the names are not in
+   the test file's path): 32 violations remain; fingerprints are what closes it there.
+   Arms 3 and 4 fall from about 20% to about 10%: with no rules learned, every test run is now an unreviewed path.
+   The fix cannot see names that were never read through the gateway (data that lives only in a fixture the agent never
+   opened): `test_known_limit_names_the_gateway_never_saw_still_pass` pins that, and `mint_strict` remains the answer
+   for it until a semantic judge is approved.
 2. A careless review decision is not caught by the gateway (`tests/test_arms_e2e.py` creates one on purpose and
    checks that the canary scan sees it).
 
@@ -201,6 +218,12 @@ Real runs cost money and are not deterministic: run each arm more than once befo
   quickly (20 decisions in 37 tasks) and the late phase is not "more learned" so much as a different mix. Compare an
   arm with the `oracle` ceiling, not early with late.
 - **The reviewer is perfect by default.** `--reviewer-error-rate` makes it careless.
+- **The fingerprint false-positive rate is measured on invented data.** `python -m bench.fpaudit` holds back 0 of 36
+  PUBLIC files, 4 of 32 OWN_IP files (they repeat the owner's company name, which also sits in a confidential contract)
+  and only the 3 leaking ones of 21 real pytest outputs; the arms show no request held back by a fingerprint outside the
+  leaking tasks. Real repositories have more shared vocabulary; the stoplist (`common_words.txt`) is small and hand
+  made, and the numbers say nothing about its coverage of real text. The threshold sweep (`fp_t1`, `fp_t4`) is flat on
+  this task set: the arms cannot choose between thresholds, the audit shows 4 OWN_IP files held back at thresholds 1-3 and 1 at threshold 4, all 3 leaks caught at every threshold.
 - **Canaries are what was planted.** Zero violations means none of these values got through, not that nothing could.
   Prompts contain no undetectable secrets by design; a user who pastes a customer name into a prompt is not defended
   by the gateway and is not measured here.
@@ -221,6 +244,7 @@ Real runs cost money and are not deterministic: run each arm more than once befo
 | `agent.py`, `tools.py`, `solver.py`, `upstream.py` | agent loop, tools, scripted model, mock and reserved upstreams |
 | `tokens.py`, `cachesim.py` | token estimate and prefix-cache simulation |
 | `canary.py`, `acceptance.py`, `reviewer.py`, `shims.py` | canary scan, deterministic acceptance, simulated reviewer, what-if shim |
+| `fpaudit.py` | static false-positive audit of the gateway's content fingerprints |
 | `metrics.py`, `report.py` | aggregation and output files |
 | `taskmodel.py`, `taskset.py`, `tasks_public.py`, `tasks_private.py`, `repos.py` | tasks and materials |
 | `materials/` | the two repositories, their truth labels and canaries, `gen_bulk.py` (regenerates the bulky files) |
