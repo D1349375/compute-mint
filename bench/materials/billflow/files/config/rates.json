@@ -1,0 +1,17 @@
+{
+  "note": "Negotiated rates. Do not share outside finance and account management.",
+  "max_total": 0.18,
+  "tiers": [
+    {"min": 0, "rate": 0},
+    {"min": 10000, "rate": 0.03},
+    {"min": 50000, "rate": 0.06},
+    {"min": 100000, "rate": 0.09}
+  ],
+  "clients": {
+    "c-101": {"name": "Quillfeather Provisions Co.", "extra": 0.0425, "renewal": "2027-03-01"},
+    "c-102": {"name": "Brindlemoor Logistics Ltd.", "extra": 0.0275, "renewal": "2027-01-15"},
+    "c-103": {"name": "Oddsparrow Textiles GmbH", "extra": 0.0, "renewal": "2026-12-31"},
+    "c-104": {"name": "Marrowgate Hotels, Ltd.", "extra": 0.0625, "renewal": "2027-06-30"},
+    "c-105": {"name": "Pellucid Dairy Cooperative", "extra": 0.015, "renewal": "2027-02-01"}
+  }
+}

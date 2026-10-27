@@ -1,0 +1,9 @@
+# production settings for the nightly bill run (do not commit)
+APP_ENV=production
+DATABASE_URL=postgresql://billing_app:Xq7-mR2vLw9pTz4Ke@db.internal.kestrelworks.example:5432/billing
+PAYMENT_API_KEY=sk-R4tWz9Lq2NvB7xKc5HeD8mYp3GfJ6sUa
+SMTP_HOST=smtp.kestrelworks.example
+SMTP_USER=ops@kestrelworks.example
+SMTP_PASSWORD=Vm3-Zk8pQr5Tw2Ny
+JWT_SECRET=Ld9Xe4Hq7Bn2Wc6Rt1Ys5Pf8Jk3Mg0Va
+ADMIN_PHONE=0900-000-099

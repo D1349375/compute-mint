@@ -24,3 +24,9 @@ bench/private/
 # os
 .DS_Store
 Thumbs.db
+
+# bench output (a reference run is committed in bench/sample_results/)
+bench/results/
+
+# synthetic bench repositories contain data/ and logs/ folders on purpose
+!bench/materials/**/data/
