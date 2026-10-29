@@ -29,7 +29,7 @@ class MockUpstream:
 
 def make_client():
     upstream = MockUpstream()
-    app = create_app(Config(api_base="https://mock/v1", api_key="test"), transport=httpx.MockTransport(upstream))
+    app = create_app(Config(api_base="https://mock/v1", api_key="test", billing="paid"), transport=httpx.MockTransport(upstream))
     return TestClient(app), upstream
 
 

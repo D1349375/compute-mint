@@ -29,6 +29,8 @@ Compute Mint is a gateway between agents and models. It:
 
 Regardless of any user setting, Compute Mint never routes personal information (including the user's own), credentials, third-party confidential data or regulated data to Contributor services. Users may only choose how much of **their own, publishable** content to contribute.
 
+Standard is private only when the account pays. Use paid with promotional credits (hackathon credits included) counts as non-paid under the Terms (§13.3), and every non-paid request may be used for training (§6), on Standard models too. So by default (`CM_BILLING=credits`) whatever may not go to Contributor stays on this machine: it runs on a local model if one is configured and is held back otherwise. All live runs during the hackathon use credits and invented data only.
+
 ## License
 
 TBD

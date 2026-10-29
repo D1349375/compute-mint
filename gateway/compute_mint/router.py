@@ -16,6 +16,8 @@ from .vault import Vault
 
 CONTRIBUTOR = "contributor"
 STANDARD = "standard"
+LOCAL = "local"    # a model on this machine; nothing leaves it
+HELD = "held"      # not sent anywhere (see billing.py)
 
 
 @dataclass
