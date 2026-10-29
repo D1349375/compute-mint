@@ -19,7 +19,16 @@ Point an agent at `http://localhost:8787/v1`. Per-request headers:
 | `x-cm-client` | `anthropic`, `openai`, `unknown` | model behind the calling agent; labels the agent's own assistant messages with that origin |
 | `x-cm-root` | absolute path | the agent's working directory; places the relative paths printed in tool output. Optional: the system prompt (or first user message) is searched for `working directory: …`, `repository root is …`, `<cwd>…</cwd>`, and a tool call's own `cwd`/`workdir` argument wins |
 
-`GET /v1/ledger/summary` returns spend, counterfactual spend, savings, the contributable token share, the cache hit rate and the Context Broker's context ratio.
+`GET /v1/ledger/summary` returns spend, counterfactual spend, savings, the contributable token share, the cache hit rate, the Context Broker's context ratio, held and local request counts, and the spend paid with credits.
+
+## Billing mode
+
+| `CM_BILLING` | A request that may not go to Contributor goes to |
+|---|---|
+| `paid` | Standard (`STANDARD_MODEL`). Paid use is not used for training (ToS §5.1) |
+| `credits` (default) | the local model at `LOCAL_API_BASE` (`LOCAL_MODEL`, default `muse-glimmer`) if set, otherwise nowhere: the gateway answers 403 with lane `held` |
+
+Use paid with promotional credits, hackathon credits included, counts as non-paid (ToS §13.3), and under §6 every non-paid request may be used for training and must not carry sensitive, confidential or personal information (§6.2), on Standard models as well. So on credits the only Meta requests are clean Contributor requests. Agent-authored history (Claude, GPT) is held for the same reason. Every response carries `x-cm-billing`; set `CM_BILLING=paid` only when the account pays for its usage.
 
 `GET /v1/review` lists files waiting for a sensitivity decision and the learned rules; `POST /v1/review/{id}` with `{"label": "public|own_ip|confidential", "pattern": "<optional glob>"}` turns a decision into a rule. Files with no rule are treated as confidential until reviewed; credential files (`.env`, keys, `auth.json`, …) are always FLOOR.
 
@@ -35,6 +44,7 @@ Point an agent at `http://localhost:8787/v1`. Per-request headers:
 | `policy.py` | learned path rules and the review queue; credential files are always FLOOR; labels tool output that names no file (below) |
 | `outpaths.py` | file paths in free text: tracebacks, `path:line`, pytest ids, compiler output, shell commands |
 | `fingerprint.py` | content fingerprints of sensitive text read earlier (in-memory, keyed hashes) |
+| `billing.py` | paid vs credits: where non-contributable requests go |
 | `pricing.py`, `ledger.py` | official prices and the counterfactual ledger |
 | `app.py` | the proxy |
 | `memory.py` | personal memory in SQLite (preferences, project facts, accepted plans), each with origin and label |
@@ -124,7 +134,8 @@ command = "<repo>/gateway/.venv/Scripts/python.exe"
 args = ["-m", "compute_mint.mcp_server"]
 ```
 
-Environment: `META_API_KEY`, `META_API_BASE`, `CONTRIBUTOR_MODEL`, `STANDARD_MODEL`, `LEDGER_PATH` (as the gateway),
+Environment: `META_API_KEY`, `META_API_BASE`, `CONTRIBUTOR_MODEL`, `STANDARD_MODEL`, `LEDGER_PATH`, `CM_BILLING`,
+`LOCAL_API_BASE`, `LOCAL_MODEL` (as the gateway; on credits a `delegate` call with an `instruction` is held or runs locally),
 `CM_PUBLIC_ROOT` (the only folder `delegate` may read), `CM_CALLER_ORIGIN` (`anthropic`, `openai` or
 `unknown_model`: the model driving the agent), `CM_MEMORY_PATH` or `CM_DATA_DIR` (memory database), `CODEX_HOME`.
 

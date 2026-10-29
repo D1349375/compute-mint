@@ -146,7 +146,7 @@ class Upstream:
 
 def _client():
     up = Upstream()
-    return TestClient(create_app(Config(api_base="https://mock/v1", api_key="t"), httpx.MockTransport(up))), up
+    return TestClient(create_app(Config(api_base="https://mock/v1", api_key="t", billing="paid"), httpx.MockTransport(up))), up
 
 
 @pytest.mark.parametrize("client_value", ["anthropic", "openai", None])

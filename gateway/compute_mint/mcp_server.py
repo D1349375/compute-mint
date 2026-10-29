@@ -57,8 +57,9 @@ def build_server(memory: Memory, delegator: Delegator, quota_reader: Callable[[]
 
 def main() -> None:
     config = DelegateConfig()
+    local = HttpUpstream(config.local_api_base, "") if config.local_api_base else None
     delegator = Delegator(PublicFetcher(config.public_root), HttpUpstream(config.api_base, config.api_key),
-                          config, Ledger(config.ledger_path))
+                          config, Ledger(config.ledger_path), local=local)
     build_server(Memory(default_path()), delegator).run()
 
 

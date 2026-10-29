@@ -395,7 +395,7 @@ class Agent:
             return httpx.Response(200, json={"id": "x", "object": "chat.completion", "model": body["model"],
                                              "choices": [{"index": 0, "message": msg, "finish_reason": "stop"}],
                                              "usage": {"prompt_tokens": 100, "completion_tokens": 10}})
-        self.app = create_app(Config(api_base="https://mock/v1", api_key="test"), transport=httpx.MockTransport(upstream))
+        self.app = create_app(Config(api_base="https://mock/v1", api_key="test", billing="paid"), transport=httpx.MockTransport(upstream))
         self.client = TestClient(self.app)
 
     def post(self, session, messages, root=ROOT):

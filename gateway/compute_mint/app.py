@@ -7,6 +7,9 @@ Agents point their base_url at this server. Per-request headers:
 - x-cm-client:  model behind the calling agent: anthropic | openai | unknown (default unknown)
 - x-cm-root:    absolute path of the agent's working directory (places relative paths in tool output;
                 optional, the system prompt is searched for it otherwise)
+
+Billing (CM_BILLING, default credits) decides where non-contributable requests go: Standard when
+the account pays (ToS §5), otherwise a local model or nowhere (see billing.py).
 """
 import os
 from dataclasses import dataclass, field
@@ -15,6 +18,7 @@ import httpx
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 
+from .billing import CREDITS, held_reason, non_contributor_lane, parse_billing
 from .broker import Broker
 from .context import Provenance, fingerprint
 from .labels import Label
@@ -22,7 +26,7 @@ from .ledger import Ledger
 from .policy import Policy, clean_root
 from .origin import OriginTracker, parse_client
 from .pricing import Usage
-from .router import CONTRIBUTOR, payload_digest, rehydrate_response, route
+from .router import CONTRIBUTOR, HELD, LOCAL, STANDARD, payload_digest, rehydrate_response, route
 from .vault import Vault
 
 LABEL_NAMES = {"public": Label.PUBLIC, "own_ip": Label.OWN_IP, "confidential": Label.CONFIDENTIAL}
@@ -36,6 +40,9 @@ class Config:
     standard_model: str = os.environ.get("STANDARD_MODEL", "muse-spark-1.3")
     ledger_path: str = os.environ.get("LEDGER_PATH", ":memory:")
     policy_path: str = os.environ.get("POLICY_PATH", ":memory:")
+    billing: str = os.environ.get("CM_BILLING", CREDITS)          # paid | credits; unknown means credits
+    local_api_base: str = os.environ.get("LOCAL_API_BASE", "")    # OpenAI-compatible server on this machine
+    local_model: str = os.environ.get("LOCAL_MODEL", "muse-glimmer")
     output_paths: bool = True    # label tool output by the paths it names
     fingerprints: bool = True    # label tool output by sensitive text read earlier
     fingerprint_threshold: int = 2   # score a message needs (see fingerprint.py)
@@ -51,6 +58,7 @@ class SessionState:
 
 def create_app(config: Config | None = None, transport: httpx.AsyncBaseTransport | None = None) -> FastAPI:
     config = config or Config()
+    billing = parse_billing(config.billing)
     app = FastAPI(title="Compute Mint gateway")
     ledger = Ledger(config.ledger_path)
     policy = Policy(config.policy_path, output_paths=config.output_paths, fingerprints=config.fingerprints,
@@ -58,6 +66,8 @@ def create_app(config: Config | None = None, transport: httpx.AsyncBaseTransport
     sessions: dict[str, SessionState] = {}
     client = httpx.AsyncClient(base_url=config.api_base, transport=transport, timeout=300,
                                headers={"Authorization": f"Bearer {config.api_key}"})
+    local = (httpx.AsyncClient(base_url=config.local_api_base, transport=transport, timeout=300)
+             if config.local_api_base else None)
     app.state.ledger = ledger
     app.state.policy = policy
     app.state.sessions = sessions
@@ -91,15 +101,25 @@ def create_app(config: Config | None = None, transport: httpx.AsyncBaseTransport
                          baseline_for=policy.baseline_for(messages, baseline, root=root), origins=origins)
         if decision.blocked_by:
             policy.enqueue_unknown(messages, decision.blocked_by, root=root)
-        model = config.contributor_model if decision.lane == CONTRIBUTOR else config.standard_model
+        lane = decision.lane if decision.lane == CONTRIBUTOR else non_contributor_lane(billing, local is not None)
+        if lane == HELD:
+            reason = held_reason(decision.reason)
+            ledger.record(session=session_id, lane=HELD, model=config.standard_model,
+                          context_label=decision.context_label, usage=Usage(0, 0, 0), masked_spans=0,
+                          reason=reason, sent_payload=None, billing=billing)
+            return JSONResponse({"error": {"type": "compute_mint_held", "code": "not_contributable_on_credits",
+                                           "message": reason}},
+                                status_code=403, headers={"x-cm-lane": HELD, "x-cm-billing": billing})
+        model = {CONTRIBUTOR: config.contributor_model, STANDARD: config.standard_model,
+                 LOCAL: config.local_model}[lane]
         sent, bstats = state.broker.apply(decision.messages)
         upstream_body = {**body, "model": model, "messages": sent}
 
-        resp = await client.post("/chat/completions", json=upstream_body)
+        resp = await (local if lane == LOCAL else client).post("/chat/completions", json=upstream_body)
         if resp.status_code >= 400:
             return JSONResponse(resp.json() if resp.content else {}, status_code=resp.status_code)
         data = resp.json()
-        if decision.lane == CONTRIBUTOR:
+        if lane == CONTRIBUTOR:
             data = rehydrate_response(data, state.vault)
 
         for choice in data.get("choices", []):
@@ -108,14 +128,16 @@ def create_app(config: Config | None = None, transport: httpx.AsyncBaseTransport
                 state.origin.record_reply(choice["message"], origins)
 
         row = ledger.record(
-            session=session_id, lane=decision.lane, model=model, context_label=decision.context_label,
+            session=session_id, lane=lane, model=model, context_label=decision.context_label,
             usage=Usage.from_openai(data.get("usage")), masked_spans=decision.masked_spans,
             reason=decision.reason,
-            sent_payload=payload_digest(sent) if decision.lane == CONTRIBUTOR else None,
-            chars_in=bstats.chars_in, chars_out=bstats.chars_out,
+            sent_payload=payload_digest(sent) if lane == CONTRIBUTOR else None,
+            chars_in=bstats.chars_in, chars_out=bstats.chars_out, billing=billing,
+            counterfactual_model=config.standard_model if lane == LOCAL else None,
         )
         headers = {
-            "x-cm-lane": decision.lane,
+            "x-cm-lane": lane,
+            "x-cm-billing": billing,
             "x-cm-cost": f"{row['cost']:.6f}",
             "x-cm-counterfactual": f"{row['counterfactual']:.6f}",
             "x-cm-masked-spans": str(decision.masked_spans),

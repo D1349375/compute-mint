@@ -30,3 +30,4 @@
 - 金鑰只放 `.env`，絕不 commit。
 - demo 和 bench 不得放入真實的 session 內容，只能用彙總數字。
 - Contributor 請求一律從乾淨 context 重新組裝，不得沿用原 session 歷史。
+- 用促銷額度（含黑客松 $150）時，所有請求都算非付費服務（ToS §13.3、§6），Standard 也會被拿去訓練。所以預設 `CM_BILLING=credits`：不能送 Contributor 的內容只能走本機模型，不然就擋下。真實 API 的實測只能用合成資料。

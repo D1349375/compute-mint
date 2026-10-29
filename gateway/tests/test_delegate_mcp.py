@@ -65,7 +65,7 @@ def env(tmp_path):
                             resolver=lambda host: ["93.184.216.34"])
     upstream = FakeUpstream()
     ledger = Ledger()
-    cfg = DelegateConfig(api_base="https://mock/v1", api_key="t", caller=Origin.ANTHROPIC, public_root=str(root))
+    cfg = DelegateConfig(api_base="https://mock/v1", api_key="t", caller=Origin.ANTHROPIC, public_root=str(root), billing="paid")
     return fetcher, upstream, ledger, Delegator(fetcher, upstream, cfg, ledger), requests, tmp_path
 
 
@@ -123,7 +123,7 @@ def test_free_text_never_reaches_contributor_for_any_caller_or_content(env):
     import random
     rng = random.Random(3)
     for caller in (Origin.ANTHROPIC, Origin.OPENAI, Origin.UNKNOWN_MODEL):
-        d = Delegator(fetcher, upstream, DelegateConfig(api_base="x", api_key="x", caller=caller))
+        d = Delegator(fetcher, upstream, DelegateConfig(api_base="x", api_key="x", caller=caller, billing="paid"))
         for _ in range(25):
             marker = f"FREE-{rng.randrange(10**9)}"
             task = rng.choice(sorted(TEMPLATES))

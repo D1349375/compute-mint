@@ -92,7 +92,7 @@ def run_arm(spec: ArmSpec, tasks: tuple[IndexedTask, ...], options: RunOptions) 
     recorder = RecordingTransport(upstream.transport())
     config = Config(api_base="https://mock.invalid/v1", api_key="mock-key-not-a-real-key",
                     contributor_model=CONTRIBUTOR_MODEL, standard_model=STANDARD_MODEL,
-                    ledger_path=":memory:", policy_path=":memory:",
+                    ledger_path=":memory:", policy_path=":memory:", billing="paid",
                     output_paths=spec.output_paths, fingerprints=spec.fingerprints,
                     fingerprint_threshold=spec.fingerprint_threshold)
     app = create_app(config, transport=recorder)

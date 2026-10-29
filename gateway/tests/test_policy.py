@@ -49,7 +49,7 @@ def _client():
             message = {"role": "assistant", "content": "ok"}
         return httpx.Response(200, json={"choices": [{"index": 0, "message": message}], "model": body["model"],
                                          "usage": {"prompt_tokens": 1000, "completion_tokens": 100}})
-    app = create_app(Config(api_base="https://mock/v1", api_key="t"), transport=httpx.MockTransport(upstream))
+    app = create_app(Config(api_base="https://mock/v1", api_key="t", billing="paid"), transport=httpx.MockTransport(upstream))
     return TestClient(app)
 
 
