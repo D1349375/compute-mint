@@ -28,6 +28,10 @@ CREATE TABLE IF NOT EXISTS requests (
 );
 """
 
+REQUEST_COLUMNS = ("id", "ts", "session", "lane", "model", "context_label", "prompt_tokens", "cached_tokens",
+                   "completion_tokens", "cost", "counterfactual", "masked_spans", "reason", "sent_payload",
+                   "chars_in", "chars_out", "billing")
+
 
 class Ledger:
     def __init__(self, path: str | Path = ":memory:") -> None:
@@ -52,6 +56,36 @@ class Ledger:
         self.db.execute(f"INSERT INTO requests ({cols}) VALUES ({', '.join('?' * len(row))})", tuple(row.values()))
         self.db.commit()
         return row
+
+    def requests(self, session: str | None = None, lane: str | None = None, limit: int = 50, offset: int = 0,
+                 payload: bool = False) -> dict:
+        """One page of rows, newest first. `sent_payload` is included only when asked for."""
+        conds, args = [], []
+        for col, value in (("session", session), ("lane", lane)):
+            if value:
+                conds.append(f"{col} = ?")
+                args.append(value)
+        where = f"WHERE {' AND '.join(conds)}" if conds else ""
+        total = self.db.execute(f"SELECT COUNT(*) FROM requests {where}", args).fetchone()[0]
+        cols = [c for c in REQUEST_COLUMNS if payload or c != "sent_payload"]
+        cur = self.db.execute(f"SELECT {', '.join(cols)}, sent_payload IS NOT NULL FROM requests {where} "
+                              "ORDER BY id DESC LIMIT ? OFFSET ?", (*args, limit, offset))
+        rows = [{**dict(zip(cols, r[:-1])), "has_payload": bool(r[-1])} for r in cur.fetchall()]
+        return {"total": total, "limit": limit, "offset": offset, "requests": rows}
+
+    def request(self, request_id: int) -> dict | None:
+        row = self.db.execute(f"SELECT {', '.join(REQUEST_COLUMNS)} FROM requests WHERE id = ?", (request_id,)).fetchone()
+        if row is None:
+            return None
+        out = dict(zip(REQUEST_COLUMNS, row))
+        return {**out, "has_payload": out["sent_payload"] is not None}
+
+    def sessions(self) -> list[dict]:
+        cur = self.db.execute("""SELECT session, COUNT(*), MIN(ts), MAX(ts), COALESCE(SUM(cost),0),
+                                        COALESCE(SUM(counterfactual),0)
+                                 FROM requests GROUP BY session ORDER BY MAX(id) DESC""")
+        return [{"session": s, "requests": n, "first_ts": a, "last_ts": b, "spent_usd": c, "counterfactual_usd": cf}
+                for s, n, a, b, c, cf in cur.fetchall()]
 
     def summary(self, session: str | None = None) -> dict:
         where, args = ("WHERE session = ?", (session,)) if session else ("", ())

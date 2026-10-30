@@ -1,0 +1,4 @@
+# demo ledger and policy written by gateway/demo/seed.py
+demo-data/
+next-env.d.ts
+*.tsbuildinfo
