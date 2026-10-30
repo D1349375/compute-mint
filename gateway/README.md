@@ -21,6 +21,13 @@ Point an agent at `http://localhost:8787/v1`. Per-request headers:
 
 `GET /v1/ledger/summary` returns spend, counterfactual spend, savings, the contributable token share, the cache hit rate, the Context Broker's context ratio, held and local request counts, and the spend paid with credits.
 
+Read-only views for the dashboard: `GET /v1/ledger/requests` (newest first; `session`, `lane`, `limit` 1–500,
+`offset`; `payload=true` adds `sent_payload`, the masked context of a Contributor request), `GET /v1/ledger/requests/{id}`,
+`GET /v1/ledger/sessions`, and `GET /v1/status` (billing mode, local model if configured, model names).
+
+`python -m demo.seed` writes demo data for the dashboard without an API key: scripted sessions over the invented
+repositories in `bench/materials/` sent through the gateway on a mock upstream (see `dashboard/README.md`).
+
 ## Billing mode
 
 | `CM_BILLING` | A request that may not go to Contributor goes to |

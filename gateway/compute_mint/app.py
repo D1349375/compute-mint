@@ -149,6 +149,36 @@ def create_app(config: Config | None = None, transport: httpx.AsyncBaseTransport
     async def summary(session: str | None = None) -> dict:
         return ledger.summary(session)
 
+    # Read-only views for the dashboard. They show what the ledger already holds; nothing here routes.
+    @app.get("/v1/ledger/requests")
+    async def ledger_requests(session: str | None = None, lane: str | None = None, limit: int = 50,
+                              offset: int = 0, payload: bool = False) -> dict:
+        if lane is not None and lane not in (CONTRIBUTOR, STANDARD, LOCAL, HELD):
+            raise HTTPException(400, f"lane must be one of {[CONTRIBUTOR, STANDARD, LOCAL, HELD]}")
+        if not 1 <= limit <= 500 or offset < 0:
+            raise HTTPException(400, "limit must be 1..500 and offset >= 0")
+        page = ledger.requests(session, lane, limit, offset, payload)
+        for row in page["requests"]:
+            row["context_label"] = Label(row["context_label"]).name
+        return page
+
+    @app.get("/v1/ledger/requests/{request_id}")
+    async def ledger_request(request_id: int) -> dict:
+        row = ledger.request(request_id)
+        if row is None:
+            raise HTTPException(404, "no such request")
+        row["context_label"] = Label(row["context_label"]).name
+        return row
+
+    @app.get("/v1/ledger/sessions")
+    async def ledger_sessions() -> dict:
+        return {"sessions": ledger.sessions()}
+
+    @app.get("/v1/status")
+    async def status() -> dict:
+        return {"billing": billing, "local_model": config.local_model if local is not None else None,
+                "contributor_model": config.contributor_model, "standard_model": config.standard_model}
+
     @app.get("/v1/review")
     async def review_queue() -> dict:
         return {"pending": policy.pending(), "rules": [{"pattern": p, "label": l.name} for p, l in policy.rules()]}
