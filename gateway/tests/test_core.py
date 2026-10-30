@@ -1,8 +1,9 @@
+import json
 import random
 import string
 
 from compute_mint.context import Provenance, label_messages
-from compute_mint.detect import find_spans
+from compute_mint.detect import find_spans, has_floor
 from compute_mint.labels import Label, contributable, join
 from compute_mint.pricing import Usage, cost, counterfactual_cost
 from compute_mint.router import CONTRIBUTOR, STANDARD, rehydrate_response, route
@@ -10,6 +11,17 @@ from compute_mint.vault import Vault
 
 KEY = "sk-" + "a1B2c3D4e5F6g7H8i9J0k1L2"
 EMAIL = "alice.chen@acme-corp.io"
+
+
+def test_a_secret_after_a_json_escape_is_still_found():
+    # Tool-call arguments are JSON text: a key on its own line has a letter right in front of it.
+    for prefix in (r"\n", r"\r", r"\t", r"。", r"\\n"):
+        assert has_floor(prefix + KEY), prefix
+    assert has_floor(r"\nA123456789")
+    assert not has_floor("task-a1B2c3D4e5F6g7H8i9J0k1L2")     # still a word start, not a substring search
+    args = json.dumps({"input": f"*** Begin Patch\n{KEY}\n*** End Patch"})
+    masked, n = Vault().mask(args)
+    assert n == 1 and KEY not in masked and json.loads(masked)["input"].splitlines()[1] == "⟨API_KEY_1⟩"
 
 
 def test_lattice_and_dial_clamp():

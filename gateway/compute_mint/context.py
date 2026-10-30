@@ -22,7 +22,8 @@ def message_text(msg: dict) -> str:
     parts = []
     content = msg.get("content")
     if isinstance(content, str):
-        parts.append(content)
+        if content:     # a reply with only tool calls comes back with "" or null, depending on the client
+            parts.append(content)
     elif isinstance(content, list):
         parts += [p.get("text", "") for p in content if isinstance(p, dict)]
     for call in msg.get("tool_calls") or []:

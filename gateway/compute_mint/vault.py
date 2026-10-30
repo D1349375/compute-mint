@@ -41,5 +41,32 @@ class Vault:
     def rehydrate(self, text: str) -> str:
         return PLACEHOLDER.sub(lambda m: self._by_placeholder.get(m.group(0), m.group(0)), text)
 
+    def may_become_placeholder(self, tail: str) -> bool:
+        """Whether `tail` is the start of a placeholder this vault can restore."""
+        return any(ph.startswith(tail) and ph != tail for ph in self._by_placeholder)
+
     def originals(self) -> list[str]:
         return list(self._by_value)
+
+
+class StreamRestorer:
+    """Rehydrates text that arrives in pieces: a tail that may still become a placeholder is held back."""
+
+    def __init__(self, vault: Vault | None) -> None:
+        self.vault, self.held = vault, ""
+
+    def feed(self, text: str) -> str:
+        if self.vault is None:
+            return text
+        text = self.held + text
+        start = text.rfind("⟨")
+        tail = text[start:] if start >= 0 else ""
+        if tail and self.vault.may_become_placeholder(tail):
+            self.held, text = tail, text[:start]
+        else:
+            self.held = ""
+        return self.vault.rehydrate(text)
+
+    def flush(self) -> str:
+        held, self.held = self.held, ""
+        return self.vault.rehydrate(held) if self.vault else held

@@ -63,10 +63,3 @@ def test_confidential_project_stays_standard_and_ledger_adds_up():
     assert round(s["counterfactual_usd"], 5) == round(2 * 0.01275, 5)
     assert round(s["spent_usd"], 5) == round(0.01275 + 0.00073, 5)
     assert 0.49 < s["contributable_token_share"] < 0.51
-
-
-def test_streaming_rejected_for_now():
-    client, _ = make_client()
-    r = client.post("/v1/chat/completions", json={"model": "any", "stream": True,
-                                                  "messages": [{"role": "user", "content": "hi"}]})
-    assert r.status_code == 400

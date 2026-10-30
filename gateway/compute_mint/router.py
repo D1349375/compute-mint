@@ -50,9 +50,23 @@ def _mask_message(msg: dict, vault: Vault) -> tuple[dict, int]:
     return m, total
 
 
+def mask_fields(value, vault: Vault) -> tuple[object, int]:
+    """Mask the strings of a JSON value (tool definitions and other request fields next to the messages)."""
+    if isinstance(value, str):
+        return vault.mask(value)
+    if isinstance(value, list):
+        pairs = [mask_fields(v, vault) for v in value]
+        return [v for v, _ in pairs], sum(n for _, n in pairs)
+    if isinstance(value, dict):
+        pairs = {k: mask_fields(v, vault) for k, v in value.items()}
+        return {k: v for k, (v, _) in pairs.items()}, sum(n for _, n in pairs.values())
+    return value, 0
+
+
 def route(messages: list[dict], *, baseline: Label, dial: Label, vault: Vault, provenance: Provenance,
-          baseline_for=None, origins: list[Origin] | None = None) -> Decision:
+          baseline_for=None, origins: list[Origin] | None = None, unlabeled: str | None = None) -> Decision:
     # Contributor needs the label to fit the dial AND every message to come from an allowed origin.
+    # `unlabeled` says the request holds content that cannot be judged (see responses.py): it stays off Contributor.
     if origins is None:
         origins = message_origins(messages, provenance)
     labeled = label_messages(messages, baseline, provenance, baseline_for)
@@ -78,15 +92,20 @@ def route(messages: list[dict], *, baseline: Label, dial: Label, vault: Vault, p
 
     by_origin = [i for i, o in enumerate(origins) if not origin_allows_contributor(o)]
     blocked = sorted({i for i, r in enumerate(residuals) if not contributable(r, dial)} | set(by_origin))
-    if not blocked:
+    if not blocked and not unlabeled:
         return Decision(CONTRIBUTOR, masked, join(*residuals), spans,
                         reason="all context contributable after masking")
     why = getattr(baseline_for, "why", None)
     causes = sorted({c for i in blocked for c in (why(i) if why else ())})
-    return Decision(STANDARD, [copy.deepcopy(m) for m in messages], raw_label, 0,
+    if unlabeled and not blocked:
+        return Decision(STANDARD, [copy.deepcopy(m) for m in messages], join(raw_label, Label.CONFIDENTIAL), 0,
+                        reason=unlabeled)
+    return Decision(STANDARD, [copy.deepcopy(m) for m in messages],
+                    join(raw_label, Label.CONFIDENTIAL) if unlabeled else raw_label, 0,
                     reason=f"{len(blocked)} message(s) not contributable"
                            + (f" ({len(by_origin)} by origin)" if by_origin else "")
-                           + (f" [{', '.join(causes)}]" if causes else ""), blocked_by=blocked)
+                           + (f" [{', '.join(causes)}]" if causes else "")
+                           + (f"; {unlabeled}" if unlabeled else ""), blocked_by=blocked)
 
 
 def rehydrate_response(body: dict, vault: Vault) -> dict:

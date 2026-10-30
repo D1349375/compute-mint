@@ -6,11 +6,15 @@ so it is only the first layer; the semantic judge sits on top of it.
 import re
 from dataclasses import dataclass
 
+# A word start, also right after a JSON escape: tool-call arguments are JSON text, where the two
+# characters of an escaped line break put a letter directly in front of what follows it.
+WORD_START = r"(?:\b|(?<=\\[nrtfb])|(?<=\\u[0-9a-fA-F]{4}))"
+
 # kind -> pattern. Order matters: earlier kinds win on overlapping spans.
 PATTERNS: dict[str, re.Pattern] = {
     "PRIVATE_KEY": re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----"),
     "API_KEY": re.compile(
-        r"\b(?:sk-ant-[A-Za-z0-9_-]{20,}|sk-[A-Za-z0-9_-]{20,}|AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9]{30,}"
+        WORD_START + r"(?:sk-ant-[A-Za-z0-9_-]{20,}|sk-[A-Za-z0-9_-]{20,}|AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9]{30,}"
         r"|xox[abpr]-[A-Za-z0-9-]{10,}|AIza[0-9A-Za-z_-]{35})"
     ),
     # Patterns with a named group "v" mask only that group (the value, not the key name).
@@ -20,7 +24,7 @@ PATTERNS: dict[str, re.Pattern] = {
     ),
     "EMAIL": re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b"),
     "TW_PHONE": re.compile(r"(?<!\d)09\d{2}[- ]?\d{3}[- ]?\d{3}(?!\d)"),
-    "TW_ID": re.compile(r"\b[A-Z][12]\d{8}\b"),
+    "TW_ID": re.compile(WORD_START + r"[A-Z][12]\d{8}\b"),
     "CARD": re.compile(r"(?<!\d)(?:\d{4}[- ]){3}\d{4}(?!\d)"),
 }
 
