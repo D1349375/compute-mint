@@ -24,7 +24,8 @@ Both `POST /v1/chat/completions` and `POST /v1/responses` take these headers, st
 `GET /v1/ledger/summary` returns spend, counterfactual spend, savings, the contributable token share, the cache hit rate, the Context Broker's context ratio, held and local request counts, and the spend paid with credits.
 
 Read-only views for the dashboard: `GET /v1/ledger/requests` (newest first; `session`, `lane`, `limit` 1–500,
-`offset`; `payload=true` adds `sent_payload`, the masked context of a Contributor request), `GET /v1/ledger/requests/{id}`,
+`offset`; `payload=true` adds what left the machine in a Contributor request: `sent_payload`, the masked messages, and
+`sent_fields`, the rest of the body such as tool definitions, also masked; old rows have `sent_fields` null), `GET /v1/ledger/requests/{id}`,
 `GET /v1/ledger/sessions`, and `GET /v1/status` (billing mode, local model if configured, model names).
 
 `python -m demo.seed` writes demo data for the dashboard without an API key: scripted sessions over the invented
@@ -45,8 +46,9 @@ Use paid with promotional credits, hackathon credits included, counts as non-pai
 |---|---|
 | `labels.py` | PUBLIC < OWN_IP < CONFIDENTIAL < FLOOR; the dial can never reach CONFIDENTIAL or FLOOR |
 | `origin.py` | who produced content (USER, TOOL, PUBLIC_SOURCE, META, LOCAL_MODEL, ANTHROPIC, OPENAI, UNKNOWN_MODEL); Claude, GPT and unidentified-model output never goes to Contributor |
-| `detect.py` | deterministic credential / personal-data detectors |
-| `vault.py` | session-consistent placeholders and rehydration |
+| `detect.py` | deterministic credential / personal-data detectors; word boundaries are ASCII, so a value glued to Chinese text is found whole, and full-width forms count |
+| `vault.py` | session-consistent placeholders and rehydration; restored tool-call arguments stay valid JSON |
+| `cjk.py` | name-shaped fingerprint terms in Chinese, Japanese and Korean text |
 | `context.py` | taint tracking; provenance of gateway-generated replies |
 | `router.py` | lane decision and clean-context assembly |
 | `broker.py` | cache-aware Context Broker: compacts aged tool outputs once, memoized, so the cached prefix keeps matching |
@@ -165,6 +167,40 @@ for instance data that lives only in a fixture or generator the agent never open
 not matched; text that is sensitive only in context is not matched (that needs a semantic judge); a name that is
 also an ordinary word is a false-positive risk, a short or common one a miss; output paths with spaces are not
 found; the fingerprint score is a heuristic whose cost is measured in `bench/` (`README.md` there).
+
+**Chinese, Japanese and Korean.** Paths and Latin terms glued to these scripts are found (`錯誤在config/a.py:3行`,
+`統編TW90210017是`), and a few of their names are fingerprinted. These scripts have no spaces or capitals and the gateway
+has no segmenter, so an unusual word cannot be told from an ordinary one, and **only what has the shape of a name is
+remembered** (`cjk.py`):
+
+| Term | Example | Where |
+|---|---|---|
+| anything ending in a legal form, with its tails | `台灣鳳梨股份有限公司`, `株式会社サクラ精機`, `한빛소프트 주식회사` | anywhere |
+| the name without the legal form | `台灣鳳梨` | when the source run is just the company |
+| a field ending in an organization word, unless generic | `永昌會計師事務所`, not `物流公司` | a field: bounded by non-CJK text, not prose |
+| a field of the shape surname + given name | `王小明`, `歐陽靖`, `佐藤花子`, `김철수`, not `高雄市` | same |
+| a name after a label or before a title | `聯絡人：陳大文`, `王小明先生` | anywhere |
+
+All of these weigh 2, so one hit is enough, also from an unreviewed source. `python -m bench.fpaudit_cjk` measures the
+cost, on invented customer data (6 sources and 2,000 generated rows):
+
+| Public text | Lines | Held back |
+|---|---|---|
+| Windows messages, zh-TW | 182,766 | 0 |
+| Chromium UI strings, zh-TW / zh-CN / ja / ko | 5,020 / 5,499 / 5,518 / 5,369 | 0 / 0 / 0 / 0 |
+| `docs/PLAN.md` and hand-written public tool output | 53 | 0 |
+
+The worst case is a sensitive table that holds ordinary words as fields, which would make them terms: 0.05% of the
+Windows fields and 0.02% of the Chromium Chinese ones have the shape of a name, 0.08% Japanese, 0.19% Korean. The stoplists were tuned on
+this same text, so read those as optimistic. It caught all 15 test mentions (spaced, glued, in JSON, four scripts).
+
+Not protected, on purpose or for lack of a segmenter (a test keeps this list honest): two-character names (`王明`);
+surnames that are not on the list and foreign names written in CJK; ordinary-looking fields, however confidential
+(`重要客戶`), so a reviewed confidential file protects far less in Chinese than in English, where any unusual word
+counts; a person named only in running prose with no label or title (`這件事由陳美玲負責`); other spellings and scripts
+(`臺灣鳳梨` for `台灣鳳梨`, simplified for traditional); more than 100,000 CJK characters of one text. A company's own
+directory glued to prose (`客戶data/a.csv`) is read as `data/a.csv`. Email addresses with a non-ASCII local part are
+not detected.
 
 ## Origin: which content may go to Contributor
 

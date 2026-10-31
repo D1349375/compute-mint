@@ -101,7 +101,7 @@ async def read_chunks(response: httpx.Response) -> AsyncIterator[dict | None]:
 class _Call:
     def __init__(self, vault: Vault | None) -> None:
         self.id, self.type, self.name, self.arguments = None, "function", "", []
-        self.restorer = StreamRestorer(vault)
+        self.restorer = StreamRestorer(vault, json_text=True)
 
 
 class _Choice:

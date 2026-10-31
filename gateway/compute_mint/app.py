@@ -70,6 +70,7 @@ class Admitted:
     origins: list[Origin]
     sent: list[dict]
     bstats: BrokerStats
+    sent_fields: str | None = None     # the rest of the upstream body, set when it goes out
 
 
 def create_app(config: Config | None = None, transport: httpx.AsyncBaseTransport | None = None) -> FastAPI:
@@ -149,7 +150,11 @@ def create_app(config: Config | None = None, transport: httpx.AsyncBaseTransport
             sent_payload=payload_digest(adm.sent) if adm.lane == CONTRIBUTOR else None,
             chars_in=adm.bstats.chars_in, chars_out=adm.bstats.chars_out, billing=billing,
             counterfactual_model=config.standard_model if adm.lane == LOCAL else None,
+            sent_fields=adm.sent_fields if adm.lane == CONTRIBUTOR else None,
         )
+
+    def note_fields(adm: Admitted, body: dict) -> None:
+        adm.sent_fields = payload_digest({k: v for k, v in body.items() if k not in ("model", "messages")})
 
     def route_headers(adm: Admitted) -> dict[str, str]:
         return {
@@ -164,6 +169,7 @@ def create_app(config: Config | None = None, transport: httpx.AsyncBaseTransport
 
     async def complete(adm: Admitted, body: dict) -> dict | JSONResponse:
         """One whole upstream completion, with placeholders restored."""
+        note_fields(adm, body)
         resp = await (local if adm.lane == LOCAL else client).post("/chat/completions", json=body)
         if resp.status_code >= 400:
             return JSONResponse(resp.json() if resp.content else {}, status_code=resp.status_code)
@@ -174,8 +180,9 @@ def create_app(config: Config | None = None, transport: httpx.AsyncBaseTransport
         """Open the upstream stream. Everything that can fail before the first byte is still a plain HTTP answer."""
         upstream = local if adm.lane == LOCAL else client
         options = {**(body.get("stream_options") or {}), "include_usage": True}
-        request = upstream.build_request("POST", "/chat/completions",
-                                         json={**body, "stream": True, "stream_options": options})
+        body = {**body, "stream": True, "stream_options": options}
+        note_fields(adm, body)
+        request = upstream.build_request("POST", "/chat/completions", json=body)
         headers = route_headers(adm)
         try:
             resp = await upstream.send(request, stream=True)

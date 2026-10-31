@@ -21,6 +21,8 @@ credential file says so) / when it merely has not been reviewed yet:
 A message is a match when the distinct hits score 2 or more. An unreviewed source is weaker evidence (most
 files are not sensitive, and ordinary vocabulary would otherwise block unrelated work), so only its names and
 identifiers count.
+Chinese, Japanese and Korean text contributes only name-shaped terms, of kind `name` (`cjk.py`): these scripts
+have no spaces or capitals to tell a name from an ordinary word by.
 Prose (`.md`, `.txt`, ...) contributes unusual words only when capitalized in mid-sentence (proper nouns).
 Source code contributes only the contents of its string literals and numeric constants: identifiers are shared
 between files and say nothing about sensitivity. Words the caller already has in its own prompt are exempt, so
@@ -34,6 +36,9 @@ from collections import OrderedDict
 from dataclasses import dataclass
 from pathlib import Path
 
+from . import cjk
+from .detect import half_width
+
 IDENT, NAME, WORD, WEAK = "I", "N", "S", "W"
 SCORE = {IDENT: 2, NAME: 2, WORD: 2, WEAK: 1}          # sources known to be sensitive
 SCORE_UNREVIEWED = {IDENT: 2, NAME: 2, WORD: 0, WEAK: 0}
@@ -41,9 +46,9 @@ THRESHOLD = 2
 MAX_TERMS_PER_SOURCE = 20_000
 MAX_TERMS = 400_000
 
-_ATOM = re.compile(r"[^\W_]+", re.UNICODE)
-_SEGMENT_BREAK = re.compile(r"""[\r\n\t,;:|(){}\[\]<>"=/\\]+|[.!?]+(?=\s|$)""")
-_DECIMAL = re.compile(r"(?<![\w.])\d+\.\d{3,}(?![\w])")
+_ATOM = re.compile(rf"[^\W_{cjk.SCRIPTS}]+", re.UNICODE)      # a Latin word or a number glued to Chinese is still that word
+_SEGMENT_BREAK = re.compile(r"""[\r\n\t,;:|(){}\[\]<>"=/\\\u3001-\u3002\u3008-\u3011]+|[.!?]+(?=\s|$)""")
+_DECIMAL = re.compile(r"(?<![\w.])\d+\.\d{3,}(?![\w])", re.ASCII)
 _TRIPLE_QUOTED = re.compile(r'"""[\s\S]*?"""' + "|" + r"'''[\s\S]*?'''")
 _STRING_LITERAL = re.compile(r'"(?:\\.|[^"\\\n]){3,}"|\'(?:\\.|[^\'\\\n]){3,}\'')
 PROSE_EXTENSIONS = frozenset(".md .rst .txt .adoc .tex .html .htm".split())
@@ -86,6 +91,7 @@ def extract(text: str, code: bool = False, prose: bool = False) -> dict[str, str
         scope = "\n".join(literals) + "\n" + "\n".join(_DECIMAL.findall(text))
     else:
         scope = text
+    scope = half_width(scope)
     out: dict[str, str] = {}
 
     def put(term: str, kind: str) -> None:
@@ -116,12 +122,15 @@ def extract(text: str, code: bool = False, prose: bool = False) -> dict[str, str
                 put(a1 + " " + a2, NAME)
         if len(out) > MAX_TERMS_PER_SOURCE:
             break
+    for term in cjk.terms(scope, prose):
+        put(term, NAME)
     return out
 
 
 def probe_terms(text: str) -> list[str]:
     """Every term of `text` that could be in the index: atoms of 4+ characters, adjacent pairs, decimals."""
-    seen: dict[str, None] = {}
+    text = half_width(text)
+    seen: dict[str, None] = dict.fromkeys(cjk.probe_terms(text))
     for d in _DECIMAL.findall(text):
         seen[d] = None
     for segment in _SEGMENT_BREAK.split(text):

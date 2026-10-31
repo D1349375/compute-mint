@@ -117,9 +117,9 @@ def rehydrate_response(body: dict, vault: Vault) -> dict:
         for call in msg.get("tool_calls") or []:
             fn = call.get("function") or {}
             if isinstance(fn.get("arguments"), str):
-                fn["arguments"] = vault.rehydrate(fn["arguments"])
+                fn["arguments"] = vault.rehydrate_json(fn["arguments"])
     return out
 
 
-def payload_digest(messages: list[dict]) -> str:
-    return json.dumps(messages, ensure_ascii=False, sort_keys=True)
+def payload_digest(payload: list[dict] | dict) -> str:
+    return json.dumps(payload, ensure_ascii=False, sort_keys=True)

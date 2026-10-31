@@ -4,11 +4,21 @@ The same value always maps to the same placeholder within a session, so the mode
 still reason about "the same key" or "the same customer" across turns. Originals never
 leave the gateway.
 """
+import json
 import re
 
 from .detect import find_spans
 
 PLACEHOLDER = re.compile(r"⟨([A-Z_]+)_(\d+)⟩")
+
+
+def _json_safe(value: str) -> str:
+    """`value` as the inside of a JSON string. A value masked out of JSON text is already in that form: leave it."""
+    try:
+        json.loads(f'"{value}"')
+        return value
+    except ValueError:
+        return json.dumps(value, ensure_ascii=False)[1:-1]
 
 
 class Vault:
@@ -41,6 +51,13 @@ class Vault:
     def rehydrate(self, text: str) -> str:
         return PLACEHOLDER.sub(lambda m: self._by_placeholder.get(m.group(0), m.group(0)), text)
 
+    def rehydrate_json(self, text: str) -> str:
+        """Rehydrate text that is JSON (tool-call arguments), so that it stays JSON."""
+        def restore(m: re.Match) -> str:
+            value = self._by_placeholder.get(m.group(0))
+            return m.group(0) if value is None else _json_safe(value)
+        return PLACEHOLDER.sub(restore, text)
+
     def may_become_placeholder(self, tail: str) -> bool:
         """Whether `tail` is the start of a placeholder this vault can restore."""
         return any(ph.startswith(tail) and ph != tail for ph in self._by_placeholder)
@@ -52,8 +69,9 @@ class Vault:
 class StreamRestorer:
     """Rehydrates text that arrives in pieces: a tail that may still become a placeholder is held back."""
 
-    def __init__(self, vault: Vault | None) -> None:
+    def __init__(self, vault: Vault | None, json_text: bool = False) -> None:
         self.vault, self.held = vault, ""
+        self.restore = None if vault is None else vault.rehydrate_json if json_text else vault.rehydrate
 
     def feed(self, text: str) -> str:
         if self.vault is None:
@@ -65,8 +83,8 @@ class StreamRestorer:
             self.held, text = tail, text[:start]
         else:
             self.held = ""
-        return self.vault.rehydrate(text)
+        return self.restore(text)
 
     def flush(self) -> str:
         held, self.held = self.held, ""
-        return self.vault.rehydrate(held) if self.vault else held
+        return self.restore(held) if self.vault else held
