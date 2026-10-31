@@ -116,9 +116,12 @@ model_provider = "compute-mint"
 [model_providers.compute-mint]
 name = "Compute Mint"
 base_url = "http://localhost:8787/v1"
+env_key = "CM_CLIENT_KEY"    # any non-empty value: Codex wants one, and the gateway uses its own META_API_KEY
 wire_api = "responses"
 http_headers = { "x-cm-client" = "openai", "x-cm-project" = "public", "x-cm-session" = "my-repo", "x-cm-root" = "/abs/path/of/my-repo" }
 ```
+
+Checked with a real client: codex-cli 0.163.0-alpha.10.2, read-only sandbox, a throwaway `CODEX_HOME`, on a scripted mock upstream (no real model). Codex warns that it has no metadata for `muse-spark-1.3` and goes on. On a `held` answer the turn fails and shows the reason. Not yet checked against the real Meta API.
 
 Without `x-cm-session` the session is a hash of the instructions, so Codex sessions with the same instructions share one vault and provenance. Without `x-cm-root` relative paths are placed from `<cwd>` in the first user message, else treated as unreviewed. Expect `held` on credits as soon as a file with no rule is read: answer the review queue (`GET /v1/review`) or configure a local model.
 
