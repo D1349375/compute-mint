@@ -1,4 +1,4 @@
-"""OpenAI-compatible proxy.
+"""OpenAI-compatible proxy: /v1/chat/completions and /v1/responses, streaming or not.
 
 Agents point their base_url at this server. Per-request headers:
 - x-cm-session: session id (defaults to a hash of the first message)
@@ -11,22 +11,25 @@ Agents point their base_url at this server. Per-request headers:
 Billing (CM_BILLING, default credits) decides where non-contributable requests go: Standard when
 the account pays (ToS §5), otherwise a local model or nowhere (see billing.py).
 """
+import json
 import os
 from dataclasses import dataclass, field
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 
 from .billing import CREDITS, held_reason, non_contributor_lane, parse_billing
-from .broker import Broker
+from .broker import Broker, BrokerStats
 from .context import Provenance, fingerprint
 from .labels import Label
 from .ledger import Ledger
 from .policy import Policy, clean_root
-from .origin import OriginTracker, parse_client
+from .origin import Origin, OriginTracker, parse_client
 from .pricing import Usage
-from .router import CONTRIBUTOR, HELD, LOCAL, STANDARD, payload_digest, rehydrate_response, route
+from .responses import BadRequest, ResponsesRenderer, complete_response, stateful_field, to_chat
+from .router import CONTRIBUTOR, HELD, LOCAL, STANDARD, Decision, mask_fields, payload_digest, rehydrate_response, route
+from .streaming import ChatRenderer, Relay
 from .vault import Vault
 
 LABEL_NAMES = {"public": Label.PUBLIC, "own_ip": Label.OWN_IP, "confidential": Label.CONFIDENTIAL}
@@ -56,6 +59,20 @@ class SessionState:
     origin: OriginTracker = field(default_factory=OriginTracker)
 
 
+@dataclass
+class Admitted:
+    """A request after labels, routing, billing and the Broker: where it goes and what is sent."""
+    session_id: str
+    state: SessionState
+    lane: str
+    model: str
+    decision: Decision
+    origins: list[Origin]
+    sent: list[dict]
+    bstats: BrokerStats
+    sent_fields: str | None = None     # the rest of the upstream body, set when it goes out
+
+
 def create_app(config: Config | None = None, transport: httpx.AsyncBaseTransport | None = None) -> FastAPI:
     config = config or Config()
     billing = parse_billing(config.billing)
@@ -78,14 +95,8 @@ def create_app(config: Config | None = None, transport: httpx.AsyncBaseTransport
             raise HTTPException(400, f"{name} must be one of {sorted(LABEL_NAMES)}")
         return LABEL_NAMES[value]
 
-    @app.post("/v1/chat/completions")
-    async def chat(request: Request) -> JSONResponse:
-        body = await request.json()
-        if body.get("stream"):
-            raise HTTPException(400, "streaming is not supported yet")
-        messages = body.get("messages") or []
-        if not messages:
-            raise HTTPException(400, "messages is required")
+    def admit(request: Request, messages: list[dict], unlabeled: str | None = None) -> Admitted | JSONResponse:
+        """Labels, routing, billing and the Broker: what a request becomes, whichever endpoint it came in on."""
         session_id = request.headers.get("x-cm-session") or fingerprint(messages[0])[:16]
         baseline = header_label(request, "x-cm-project", "own_ip")
         dial = header_label(request, "x-cm-dial", "public")
@@ -98,7 +109,8 @@ def create_app(config: Config | None = None, transport: httpx.AsyncBaseTransport
 
         origins = state.origin.of_messages(messages, state.provenance, caller)
         decision = route(messages, baseline=baseline, dial=dial, vault=state.vault, provenance=state.provenance,
-                         baseline_for=policy.baseline_for(messages, baseline, root=root), origins=origins)
+                         baseline_for=policy.baseline_for(messages, baseline, root=root), origins=origins,
+                         unlabeled=unlabeled)
         if decision.blocked_by:
             policy.enqueue_unknown(messages, decision.blocked_by, root=root)
         lane = decision.lane if decision.lane == CONTRIBUTOR else non_contributor_lane(billing, local is not None)
@@ -113,37 +125,128 @@ def create_app(config: Config | None = None, transport: httpx.AsyncBaseTransport
         model = {CONTRIBUTOR: config.contributor_model, STANDARD: config.standard_model,
                  LOCAL: config.local_model}[lane]
         sent, bstats = state.broker.apply(decision.messages)
-        upstream_body = {**body, "model": model, "messages": sent}
+        return Admitted(session_id, state, lane, model, decision, origins, sent, bstats)
 
-        resp = await (local if lane == LOCAL else client).post("/chat/completions", json=upstream_body)
+    def upstream_body(adm: Admitted, fields: dict) -> dict:
+        """What goes upstream. On Contributor, the fields next to the messages are masked like the messages."""
+        extra = {k: v for k, v in fields.items() if k not in ("model", "messages")}
+        if adm.lane == CONTRIBUTOR:
+            extra, n = mask_fields(extra, adm.state.vault)
+            adm.decision.masked_spans += n
+        out = {**fields, **extra, "model": adm.model, "messages": adm.sent}
+        if "store" in out:
+            out["store"] = False
+        return out
+
+    def settle(adm: Admitted, usage: Usage, replies: list[dict], note: str = "") -> dict:
+        """Provenance of the replies the client now holds, and the ledger row."""
+        for message in replies:
+            adm.state.provenance.record(message, adm.decision.context_label)
+            adm.state.origin.record_reply(message, adm.origins)
+        return ledger.record(
+            session=adm.session_id, lane=adm.lane, model=adm.model, context_label=adm.decision.context_label,
+            usage=usage, masked_spans=adm.decision.masked_spans,
+            reason=f"{adm.decision.reason}; {note}" if note else adm.decision.reason,
+            sent_payload=payload_digest(adm.sent) if adm.lane == CONTRIBUTOR else None,
+            chars_in=adm.bstats.chars_in, chars_out=adm.bstats.chars_out, billing=billing,
+            counterfactual_model=config.standard_model if adm.lane == LOCAL else None,
+            sent_fields=adm.sent_fields if adm.lane == CONTRIBUTOR else None,
+        )
+
+    def note_fields(adm: Admitted, body: dict) -> None:
+        adm.sent_fields = payload_digest({k: v for k, v in body.items() if k not in ("model", "messages")})
+
+    def route_headers(adm: Admitted) -> dict[str, str]:
+        return {
+            "x-cm-lane": adm.lane,
+            "x-cm-billing": billing,
+            "x-cm-masked-spans": str(adm.decision.masked_spans),
+            "x-cm-broker-chars": f"{adm.bstats.chars_in}->{adm.bstats.chars_out}",
+        }
+
+    def cost_headers(row: dict) -> dict[str, str]:
+        return {"x-cm-cost": f"{row['cost']:.6f}", "x-cm-counterfactual": f"{row['counterfactual']:.6f}"}
+
+    async def complete(adm: Admitted, body: dict) -> dict | JSONResponse:
+        """One whole upstream completion, with placeholders restored."""
+        note_fields(adm, body)
+        resp = await (local if adm.lane == LOCAL else client).post("/chat/completions", json=body)
         if resp.status_code >= 400:
             return JSONResponse(resp.json() if resp.content else {}, status_code=resp.status_code)
         data = resp.json()
-        if lane == CONTRIBUTOR:
-            data = rehydrate_response(data, state.vault)
+        return rehydrate_response(data, adm.state.vault) if adm.lane == CONTRIBUTOR else data
 
-        for choice in data.get("choices", []):
-            if choice.get("message"):
-                state.provenance.record(choice["message"], decision.context_label)
-                state.origin.record_reply(choice["message"], origins)
+    async def relay(adm: Admitted, body: dict, renderer) -> Response:
+        """Open the upstream stream. Everything that can fail before the first byte is still a plain HTTP answer."""
+        upstream = local if adm.lane == LOCAL else client
+        options = {**(body.get("stream_options") or {}), "include_usage": True}
+        body = {**body, "stream": True, "stream_options": options}
+        note_fields(adm, body)
+        request = upstream.build_request("POST", "/chat/completions", json=body)
+        headers = route_headers(adm)
+        try:
+            resp = await upstream.send(request, stream=True)
+        except httpx.HTTPError as e:
+            settle(adm, Usage(0, 0, 0), [], f"upstream unreachable ({type(e).__name__})")
+            return JSONResponse({"error": {"type": "upstream_unreachable", "code": "upstream_unreachable",
+                                           "message": f"upstream connection failed ({type(e).__name__})"}},
+                                status_code=502, headers=headers)
+        if resp.status_code >= 400:
+            raw = await resp.aread()
+            await resp.aclose()
+            settle(adm, Usage(0, 0, 0), [], f"upstream answered {resp.status_code}")
+            try:
+                error = json.loads(raw) if raw else {}
+            except ValueError:
+                error = {"error": {"type": "upstream_error", "message": raw.decode("utf-8", "replace")}}
+            return JSONResponse(error, status_code=resp.status_code, headers=headers)
+        return Relay(resp, renderer, adm.state.vault if adm.lane == CONTRIBUTOR else None,
+                     lambda usage, replies, note: settle(adm, usage, replies, note), headers)
 
-        row = ledger.record(
-            session=session_id, lane=lane, model=model, context_label=decision.context_label,
-            usage=Usage.from_openai(data.get("usage")), masked_spans=decision.masked_spans,
-            reason=decision.reason,
-            sent_payload=payload_digest(sent) if lane == CONTRIBUTOR else None,
-            chars_in=bstats.chars_in, chars_out=bstats.chars_out, billing=billing,
-            counterfactual_model=config.standard_model if lane == LOCAL else None,
-        )
-        headers = {
-            "x-cm-lane": lane,
-            "x-cm-billing": billing,
-            "x-cm-cost": f"{row['cost']:.6f}",
-            "x-cm-counterfactual": f"{row['counterfactual']:.6f}",
-            "x-cm-masked-spans": str(decision.masked_spans),
-            "x-cm-broker-chars": f"{bstats.chars_in}->{bstats.chars_out}",
-        }
-        return JSONResponse(data, headers=headers)
+    @app.post("/v1/chat/completions")
+    async def chat(request: Request) -> Response:
+        body = await request.json()
+        refusal = stateful_field(body)
+        if refusal:
+            return JSONResponse(refusal.body(), status_code=400)
+        messages = body.get("messages") or []
+        if not messages:
+            raise HTTPException(400, "messages is required")
+        adm = admit(request, messages)
+        if isinstance(adm, JSONResponse):
+            return adm
+        out = upstream_body(adm, body)
+        if body.get("stream"):
+            include_usage = bool((body.get("stream_options") or {}).get("include_usage"))
+            return await relay(adm, out, ChatRenderer(include_usage))
+
+        data = await complete(adm, out)
+        if isinstance(data, JSONResponse):
+            return data
+        replies = [choice["message"] for choice in data.get("choices", []) if choice.get("message")]
+        row = settle(adm, Usage.from_openai(data.get("usage")), replies)
+        return JSONResponse(data, headers={**route_headers(adm), **cost_headers(row)})
+
+    @app.post("/v1/responses")
+    async def responses(request: Request) -> Response:
+        body = await request.json()
+        try:
+            converted = to_chat(body)
+        except BadRequest as e:
+            return JSONResponse(e.body(), status_code=400)
+        adm = admit(request, converted.messages, converted.unlabeled)
+        if isinstance(adm, JSONResponse):
+            return adm
+        out = upstream_body(adm, converted.fields)
+        if body.get("stream"):
+            return await relay(adm, out, ResponsesRenderer(adm.model, body, converted.kinds))
+
+        data = await complete(adm, out)
+        if isinstance(data, JSONResponse):
+            return data
+        response, replies = complete_response(data, adm.model, body, converted.kinds)
+        row = settle(adm, Usage.from_openai(data.get("usage")), replies)
+        return JSONResponse(response, headers={**route_headers(adm), **cost_headers(row)})
 
     @app.get("/v1/ledger/summary")
     async def summary(session: str | None = None) -> dict:

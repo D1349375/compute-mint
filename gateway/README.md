@@ -19,10 +19,13 @@ Point an agent at `http://localhost:8787/v1`. Per-request headers:
 | `x-cm-client` | `anthropic`, `openai`, `unknown` | model behind the calling agent; labels the agent's own assistant messages with that origin |
 | `x-cm-root` | absolute path | the agent's working directory; places the relative paths printed in tool output. Optional: the system prompt (or first user message) is searched for `working directory: …`, `repository root is …`, `<cwd>…</cwd>`, and a tool call's own `cwd`/`workdir` argument wins |
 
+Both `POST /v1/chat/completions` and `POST /v1/responses` take these headers, stream or not (see [Streaming](#streaming) and [Responses API](#responses-api-and-codex)).
+
 `GET /v1/ledger/summary` returns spend, counterfactual spend, savings, the contributable token share, the cache hit rate, the Context Broker's context ratio, held and local request counts, and the spend paid with credits.
 
 Read-only views for the dashboard: `GET /v1/ledger/requests` (newest first; `session`, `lane`, `limit` 1–500,
-`offset`; `payload=true` adds `sent_payload`, the masked context of a Contributor request), `GET /v1/ledger/requests/{id}`,
+`offset`; `payload=true` adds what left the machine in a Contributor request: `sent_payload`, the masked messages, and
+`sent_fields`, the rest of the body such as tool definitions, also masked; old rows have `sent_fields` null), `GET /v1/ledger/requests/{id}`,
 `GET /v1/ledger/sessions`, and `GET /v1/status` (billing mode, local model if configured, model names).
 
 `python -m demo.seed` writes demo data for the dashboard without an API key: scripted sessions over the invented
@@ -43,8 +46,9 @@ Use paid with promotional credits, hackathon credits included, counts as non-pai
 |---|---|
 | `labels.py` | PUBLIC < OWN_IP < CONFIDENTIAL < FLOOR; the dial can never reach CONFIDENTIAL or FLOOR |
 | `origin.py` | who produced content (USER, TOOL, PUBLIC_SOURCE, META, LOCAL_MODEL, ANTHROPIC, OPENAI, UNKNOWN_MODEL); Claude, GPT and unidentified-model output never goes to Contributor |
-| `detect.py` | deterministic credential / personal-data detectors |
-| `vault.py` | session-consistent placeholders and rehydration |
+| `detect.py` | deterministic credential / personal-data detectors; word boundaries are ASCII, so a value glued to Chinese text is found whole, and full-width forms count |
+| `vault.py` | session-consistent placeholders and rehydration; restored tool-call arguments stay valid JSON |
+| `cjk.py` | name-shaped fingerprint terms in Chinese, Japanese and Korean text |
 | `context.py` | taint tracking; provenance of gateway-generated replies |
 | `router.py` | lane decision and clean-context assembly |
 | `broker.py` | cache-aware Context Broker: compacts aged tool outputs once, memoized, so the cached prefix keeps matching |
@@ -53,12 +57,70 @@ Use paid with promotional credits, hackathon credits included, counts as non-pai
 | `fingerprint.py` | content fingerprints of sensitive text read earlier (in-memory, keyed hashes) |
 | `billing.py` | paid vs credits: where non-contributable requests go |
 | `pricing.py`, `ledger.py` | official prices and the counterfactual ledger |
-| `app.py` | the proxy |
+| `app.py` | the proxy: one path (`admit`, `upstream_body`, `settle`) behind both endpoints |
+| `streaming.py` | SSE relay: restores placeholders cut between deltas, assembles the reply for provenance, settles the ledger however the stream ends |
+| `responses.py` | Responses API requests to chat messages, chat chunks to Responses events |
 | `memory.py` | personal memory in SQLite (preferences, project facts, accepted plans), each with origin and label |
 | `delegate.py`, `sources.py` | `delegate`: fixed task templates over sources the gateway fetches itself |
 | `mcp_server.py` | MCP server (stdio): `delegate`, `recall`, `quota` |
 | `quota.py` | read-only Codex `rate_limits` from local session logs |
 | `project_card.py` | generated block in `AGENTS.md` / `CLAUDE.md` from memory |
+
+## Streaming
+
+`stream: true` relays the upstream's server-sent events. Everything the non-streaming path guarantees still holds:
+
+| | |
+|---|---|
+| Placeholders | A placeholder cut between two deltas is held back until it is complete or cannot become one, per choice and per tool call, and flushed when the stream ends. Only placeholders of this session's vault are held, so other text is never delayed. Standard and local lanes do not buffer. |
+| Provenance, origin | Recorded when the stream finishes, from the assembled message the client saw (restored values included), with the same fingerprint as a non-streaming reply. `""`, `null` and a missing `content` hash alike, because clients spell an empty reply differently. A stream that did not finish records nothing, so a partial reply comes back as foreign, which fails closed. |
+| Before the stream | Lane decision, the `held` 403, upstream 4xx/5xx and an unreachable upstream (502) are ordinary HTTP answers. |
+| After it started | An upstream failure becomes `data: {"error": {"type": "upstream_stream_error", "code", "message"}}` then `data: [DONE]` (on `/v1/responses`, `response.failed`). |
+| Headers | `x-cm-lane`, `x-cm-billing`, `x-cm-masked-spans`, `x-cm-broker-chars` as usual. Cost is not known yet when headers go out, so it comes as an SSE comment just before the end, `: x-cm-cost=0.000104 x-cm-counterfactual=0.001335`, which event-stream parsers ignore; the ledger has it too (`GET /v1/ledger/requests`). |
+| Usage | The gateway always asks upstream for `stream_options.include_usage`. The usage chunk reaches the client only if the client asked for it, so nobody trips over a chunk with empty `choices`. |
+| Ledger | One row when the stream ends, however it ends: client disconnect, upstream failure or upstream 4xx/5xx leave a row with the sent payload and a note in `reason` (`stream interrupted: …`), and the upstream connection is closed. |
+
+Limits: a stream cut before the usage chunk records the usage seen so far, usually zero (Meta's docs say an interrupted stream may omit it), so its cost is understated and `reason` says so. A failed non-streaming request still leaves no ledger row, as before. A model that writes a placeholder in JSON escapes (`⟨…`) inside tool arguments is not restored, streaming or not.
+
+## Responses API and Codex
+
+`POST /v1/responses` translates the request into chat messages and takes the same path: labels, routing, billing, Broker, ledger. The upstream is always `/chat/completions`, also on Meta, which has its own `/v1/responses`: that one stores by default (`store: true`) and chains server-side history, while chat completions is stateless, is what local models speak, and keeps a single mask-and-restore path.
+
+| Input | Becomes |
+|---|---|
+| `instructions` | a leading `system` message |
+| `input` as a string, or `message` items | messages; `developer` becomes `system` (the same level on Meta, and local servers may not know it) |
+| `function_call`, `custom_tool_call`, `local_shell_call` | `tool_calls` on one assistant message, joined to the text before them |
+| `function_call_output` and friends | a `tool` message with the matching `tool_call_id`; output of any shape becomes text, so all of it is labeled and masked |
+| `tools` | flat and nested `function` as functions; `custom` (e.g. `apply_patch`) and `local_shell` as functions, translated back in the output; hosted tools (`web_search`, …) are not offered |
+| `max_output_tokens`, `text.format`, `reasoning.effort`, `tool_choice`, `temperature`, `top_p`, `parallel_tool_calls` | their chat equivalents. Nothing else goes upstream (`metadata`, `user`, `prompt_cache_key`, `include`, …) |
+
+What is refused or dropped, and why:
+
+| Item | Handling |
+|---|---|
+| `previous_response_id`, `conversation`, `prompt`, `background`, `item_reference` | **400, nothing sent.** They point at state stored elsewhere. The gateway keeps no store, and server-side context must never decide what a Contributor request holds (ToS §6.1). Send the whole input. `/v1/chat/completions` refuses the first three as well. |
+| `store` | Always `false` upstream, on both endpoints when present. |
+| `function_call_output` whose call is not in the input | **400.** The call's arguments are what `policy.py` labels the output by; without them it cannot be judged. |
+| `reasoning` items, and any other model-generated item the gateway does not know | **Not sent on any lane**: encrypted blobs and text of unknown origin cannot be masked or judged. The gateway never emits reasoning itself, so one in the input means another model wrote it. Its presence also keeps the request off Contributor (on credits: local or `held`), and the reply is recorded as CONFIDENTIAL. |
+| Images | Passed to Standard or local only: they cannot be labeled, so the same rule applies. `input_file` is a 400. In tool output an image is replaced by a marker. |
+
+Provenance is recorded from the items the client will send back, translated exactly as an incoming request is, for every contiguous run of them: a client may replay parallel calls together or each followed by its output. `x-cm-client` works as on chat: a `message` or `function_call` the gateway did not generate counts as that origin. On Contributor the fields next to the messages (tool definitions and the like) are masked as well, on both endpoints.
+
+Codex (`config.toml`; no key is needed here, the gateway holds the upstream key):
+
+```toml
+model = "muse-spark-1.3"          # ignored by routing: the gateway picks the model of the lane
+model_provider = "compute-mint"
+
+[model_providers.compute-mint]
+name = "Compute Mint"
+base_url = "http://localhost:8787/v1"
+wire_api = "responses"
+http_headers = { "x-cm-client" = "openai", "x-cm-project" = "public", "x-cm-session" = "my-repo", "x-cm-root" = "/abs/path/of/my-repo" }
+```
+
+Without `x-cm-session` the session is a hash of the instructions, so Codex sessions with the same instructions share one vault and provenance. Without `x-cm-root` relative paths are placed from `<cwd>` in the first user message, else treated as unreviewed. Expect `held` on credits as soon as a file with no rule is read: answer the review queue (`GET /v1/review`) or configure a local model.
 
 ## Tool output that names no file
 
@@ -105,6 +167,40 @@ for instance data that lives only in a fixture or generator the agent never open
 not matched; text that is sensitive only in context is not matched (that needs a semantic judge); a name that is
 also an ordinary word is a false-positive risk, a short or common one a miss; output paths with spaces are not
 found; the fingerprint score is a heuristic whose cost is measured in `bench/` (`README.md` there).
+
+**Chinese, Japanese and Korean.** Paths and Latin terms glued to these scripts are found (`錯誤在config/a.py:3行`,
+`統編TW90210017是`), and a few of their names are fingerprinted. These scripts have no spaces or capitals and the gateway
+has no segmenter, so an unusual word cannot be told from an ordinary one, and **only what has the shape of a name is
+remembered** (`cjk.py`):
+
+| Term | Example | Where |
+|---|---|---|
+| anything ending in a legal form, with its tails | `台灣鳳梨股份有限公司`, `株式会社サクラ精機`, `한빛소프트 주식회사` | anywhere |
+| the name without the legal form | `台灣鳳梨` | when the source run is just the company |
+| a field ending in an organization word, unless generic | `永昌會計師事務所`, not `物流公司` | a field: bounded by non-CJK text, not prose |
+| a field of the shape surname + given name | `王小明`, `歐陽靖`, `佐藤花子`, `김철수`, not `高雄市` | same |
+| a name after a label or before a title | `聯絡人：陳大文`, `王小明先生` | anywhere |
+
+All of these weigh 2, so one hit is enough, also from an unreviewed source. `python -m bench.fpaudit_cjk` measures the
+cost, on invented customer data (6 sources and 2,000 generated rows):
+
+| Public text | Lines | Held back |
+|---|---|---|
+| Windows messages, zh-TW | 182,766 | 0 |
+| Chromium UI strings, zh-TW / zh-CN / ja / ko | 5,020 / 5,499 / 5,518 / 5,369 | 0 / 0 / 0 / 0 |
+| `docs/PLAN.md` and hand-written public tool output | 53 | 0 |
+
+The worst case is a sensitive table that holds ordinary words as fields, which would make them terms: 0.05% of the
+Windows fields and 0.02% of the Chromium Chinese ones have the shape of a name, 0.08% Japanese, 0.19% Korean. The stoplists were tuned on
+this same text, so read those as optimistic. It caught all 15 test mentions (spaced, glued, in JSON, four scripts).
+
+Not protected, on purpose or for lack of a segmenter (a test keeps this list honest): two-character names (`王明`);
+surnames that are not on the list and foreign names written in CJK; ordinary-looking fields, however confidential
+(`重要客戶`), so a reviewed confidential file protects far less in Chinese than in English, where any unusual word
+counts; a person named only in running prose with no label or title (`這件事由陳美玲負責`); other spellings and scripts
+(`臺灣鳳梨` for `台灣鳳梨`, simplified for traditional); more than 100,000 CJK characters of one text. A company's own
+directory glued to prose (`客戶data/a.csv`) is read as `data/a.csv`. Email addresses with a non-ASCII local part are
+not detected.
 
 ## Origin: which content may go to Contributor
 

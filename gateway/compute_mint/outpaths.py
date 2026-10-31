@@ -7,17 +7,25 @@ hit in `contracts/acme.md` points at where the text came from. This module only 
 
 Recognized: Python `File "x", line N`, `path:line[:col]`, pytest `path::test`, compiler and linter
 output (`./x.go:12:3`, `--> src/a.rs:3:5`, `src/a.ts(12,5)`), absolute POSIX and Windows paths, `./` and
-`../` paths, any `dir/file.ext`, git diff headers, `--opt=path`. Not recognized: paths that contain
-spaces (except inside `File "..."`) and a bare directory name without a slash.
+`../` paths, any `dir/file.ext`, git diff headers, `--opt=path`. Chinese, Japanese and Korean text has no
+spaces, so a path may be glued to the words around it (`錯誤在config/a.py:3行`). Not recognized: paths that
+contain spaces (except inside `File "..."`) and a bare directory name without a slash.
 """
 import posixpath
 import re
 from dataclasses import dataclass
 
+from .cjk import SCRIPTS
+from .detect import half_width
+
 _URL = re.compile(r"\b[A-Za-z][A-Za-z0-9+.-]*://\S+")
 _FILE_QUOTED = re.compile(r"""\bFile\s+(["'])(?P<p>.+?)\1""")
 _DIFF = re.compile(r"(?m)^(?:diff --git a/(?P<a>\S+) b/(?P<b>\S+)|(?:---|\+\+\+) [ab]/(?P<c>\S+))")
-_SPLIT = re.compile(r"""[\s"'<>|*?()\[\]{},;`]+""")
+_SPLIT = re.compile(r"""[\s"'<>|*?()\[\]{},;`\u3000-\u303f]+""")
+_HAS_SCRIPT = re.compile(f"[{SCRIPTS}]")
+_GLUED_TAIL = re.compile(rf"^(.*?(?:\.[A-Za-z][A-Za-z0-9]{{0,9}}|:\d+)):?[{SCRIPTS}].*$", re.S)
+_GLUED_HEAD = re.compile(rf"^[{SCRIPTS}]+:?(?=[A-Za-z0-9_.~/\\-])")
+_ROOTED_DEEP = re.compile(r"^[/\\][^/\\]+[/\\]")
 _LINE_SUFFIX = re.compile(r"(?::\d+)+(?::.*)?$")
 _EXT = re.compile(r"\.[A-Za-z][A-Za-z0-9]{0,9}$")
 _WIN_ABS = re.compile(r"^[A-Za-z]:/")
@@ -73,7 +81,7 @@ def _classify(token: str, command: bool) -> PathRef | None:
         return None
     base = parts[-1] if parts else ""
     ext = _EXT.search(base)
-    stem_ok = bool(re.search(r"[A-Za-z_]", base.split(".")[0])) or base.startswith(".")
+    stem_ok = bool(re.search(r"[^\W\d]", base.split(".")[0])) or base.startswith(".")
     if absolute:
         if not (len(parts) >= 2 or ext):
             return None
@@ -95,10 +103,27 @@ def _classify(token: str, command: bool) -> PathRef | None:
     return PathRef(norm, absolute, False, library)
 
 
+def _unglue(token: str) -> str:
+    """The path in a token that also holds the words around it. A leading run followed by a slash is a directory
+    (`資料/客戶.csv`) unless what follows is clearly rooted (`在/work/shop/a.py`)."""
+    if not _HAS_SCRIPT.search(token):
+        return token
+    tail = _GLUED_TAIL.match(token)
+    if tail:
+        token = tail.group(1)
+    head = _GLUED_HEAD.match(token)
+    if head:
+        rest = token[head.end():]
+        if not rest.startswith(("/", "\\")) or _ROOTED_DEEP.match(rest):
+            return rest
+    return token
+
+
 def paths_in_text(text: str, command: bool = False) -> list[PathRef]:
     """Paths named in `text`, in order of first appearance, without duplicates."""
     if not isinstance(text, str) or not text:
         return []
+    text = half_width(text)
     out: dict[str, PathRef] = {}
 
     def add(ref: PathRef | None) -> None:
@@ -116,7 +141,7 @@ def paths_in_text(text: str, command: bool = False) -> list[PathRef]:
                 add(_classify(m.group(g), True))
     scrubbed = _URL.sub(" ", _DIFF.sub(" ", _FILE_QUOTED.sub(" ", text)))
     for token in _SPLIT.split(scrubbed):
-        add(_classify(token, command))
+        add(_classify(_unglue(token), command))
     return list(out.values())
 
 

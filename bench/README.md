@@ -17,6 +17,7 @@ cd <repo>
 gateway/.venv/Scripts/python -m bench.run --arms all --upstream mock            # five arms, ~4 minutes
 gateway/.venv/Scripts/python -m bench.run --arms all,oracle,mint_strict,learn_nofix,learn_paths,learn_fp,fp_t1,fp_t4 --out bench/sample_results --run-id reference-run --compare bench/sample_results/before-leak-fix/summary.json
 gateway/.venv/Scripts/python -m bench.fpaudit                                     # static false-positive audit of the fingerprints
+gateway/.venv/Scripts/python -m bench.fpaudit_cjk [--corpus DIR]                  # the same for Chinese, Japanese and Korean terms; DIR holds .txt files of public text, one string per line
 gateway/.venv/Scripts/python -m bench.run --arms standard,mint --tasks T01,T14   # a few tasks
 cd bench && ../gateway/.venv/Scripts/python -m pytest -q                         # bench tests (~4 minutes)
 ```
@@ -245,6 +246,7 @@ Real runs cost money and are not deterministic: run each arm more than once befo
 | `tokens.py`, `cachesim.py` | token estimate and prefix-cache simulation |
 | `canary.py`, `acceptance.py`, `reviewer.py`, `shims.py` | canary scan, deterministic acceptance, simulated reviewer, what-if shim |
 | `fpaudit.py` | static false-positive audit of the gateway's content fingerprints |
+| `fpaudit_cjk.py` | the same audit for Chinese, Japanese and Korean terms, on invented data, with the known misses kept visible |
 | `metrics.py`, `report.py` | aggregation and output files |
 | `taskmodel.py`, `taskset.py`, `tasks_public.py`, `tasks_private.py`, `repos.py` | tasks and materials |
 | `materials/` | the two repositories, their truth labels and canaries, `gen_bulk.py` (regenerates the bulky files) |

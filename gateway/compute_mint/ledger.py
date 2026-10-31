@@ -24,26 +24,32 @@ CREATE TABLE IF NOT EXISTS requests (
     sent_payload TEXT,           -- what left the machine; only stored for Contributor requests
     chars_in INTEGER NOT NULL DEFAULT 0,   -- context size before the Context Broker
     chars_out INTEGER NOT NULL DEFAULT 0,  -- context size actually sent
-    billing TEXT NOT NULL DEFAULT 'paid'   -- paid (ToS §5) or credits (non-paid, §6)
+    billing TEXT NOT NULL DEFAULT 'paid',  -- paid (ToS §5) or credits (non-paid, §6)
+    sent_fields TEXT             -- the rest of a Contributor request's body: tools and the like, masked
 );
 """
 
 REQUEST_COLUMNS = ("id", "ts", "session", "lane", "model", "context_label", "prompt_tokens", "cached_tokens",
                    "completion_tokens", "cost", "counterfactual", "masked_spans", "reason", "sent_payload",
-                   "chars_in", "chars_out", "billing")
+                   "chars_in", "chars_out", "billing", "sent_fields")
+PAYLOAD_COLUMNS = ("sent_payload", "sent_fields")
 
 
 class Ledger:
     def __init__(self, path: str | Path = ":memory:") -> None:
         self.db = sqlite3.connect(str(path), check_same_thread=False)
         self.db.executescript(SCHEMA)
-        if "billing" not in {r[1] for r in self.db.execute("PRAGMA table_info(requests)")}:
+        columns = {r[1] for r in self.db.execute("PRAGMA table_info(requests)")}
+        if "billing" not in columns:
             self.db.execute("ALTER TABLE requests ADD COLUMN billing TEXT NOT NULL DEFAULT 'paid'")
-            self.db.commit()
+        if "sent_fields" not in columns:
+            self.db.execute("ALTER TABLE requests ADD COLUMN sent_fields TEXT")
+        self.db.commit()
 
     def record(self, *, session: str, lane: str, model: str, context_label: int, usage: Usage,
                masked_spans: int, reason: str, sent_payload: str | None, billing: str,
-               chars_in: int = 0, chars_out: int = 0, counterfactual_model: str | None = None) -> dict:
+               chars_in: int = 0, chars_out: int = 0, counterfactual_model: str | None = None,
+               sent_fields: str | None = None) -> dict:
         # A local model costs nothing; its counterfactual is the Standard model it replaced.
         row = dict(
             ts=time.time(), session=session, lane=lane, model=model, context_label=int(context_label),
@@ -51,6 +57,7 @@ class Ledger:
             completion_tokens=usage.completion_tokens, cost=0.0 if lane == LOCAL else cost(model, usage),
             counterfactual=counterfactual_cost(counterfactual_model or model, usage), masked_spans=masked_spans,
             reason=reason, sent_payload=sent_payload, chars_in=chars_in, chars_out=chars_out, billing=billing,
+            sent_fields=sent_fields,
         )
         cols = ", ".join(row)
         self.db.execute(f"INSERT INTO requests ({cols}) VALUES ({', '.join('?' * len(row))})", tuple(row.values()))
@@ -59,7 +66,7 @@ class Ledger:
 
     def requests(self, session: str | None = None, lane: str | None = None, limit: int = 50, offset: int = 0,
                  payload: bool = False) -> dict:
-        """One page of rows, newest first. `sent_payload` is included only when asked for."""
+        """One page of rows, newest first. What was sent (`sent_payload`, `sent_fields`) only when asked for."""
         conds, args = [], []
         for col, value in (("session", session), ("lane", lane)):
             if value:
@@ -67,7 +74,7 @@ class Ledger:
                 args.append(value)
         where = f"WHERE {' AND '.join(conds)}" if conds else ""
         total = self.db.execute(f"SELECT COUNT(*) FROM requests {where}", args).fetchone()[0]
-        cols = [c for c in REQUEST_COLUMNS if payload or c != "sent_payload"]
+        cols = [c for c in REQUEST_COLUMNS if payload or c not in PAYLOAD_COLUMNS]
         cur = self.db.execute(f"SELECT {', '.join(cols)}, sent_payload IS NOT NULL FROM requests {where} "
                               "ORDER BY id DESC LIMIT ? OFFSET ?", (*args, limit, offset))
         rows = [{**dict(zip(cols, r[:-1])), "has_payload": bool(r[-1])} for r in cur.fetchall()]
