@@ -240,13 +240,65 @@ def test_cli_writes_the_result_files(tmp_path, capsys):
     assert "unit" in capsys.readouterr().out
 
 
-def test_meta_upstream_is_reserved_and_makes_no_call(capsys, monkeypatch):
+def test_meta_upstream_needs_a_key_and_a_budget_and_sends_nothing_without_them(capsys, monkeypatch):
     block_external_network(monkeypatch)
+    monkeypatch.delenv("META_API_KEY", raising=False)
+    monkeypatch.setattr("compute_mint.envfile.load_env_file", lambda *a, **k: [])    # never read the real .env in a test
+    assert main(["--arms", "all", "--upstream", "meta", "--budget", "1"]) == 2
+    assert "META_API_KEY" in capsys.readouterr().err
+    monkeypatch.setenv("META_API_KEY", "test-key-not-real")
     assert main(["--arms", "all", "--upstream", "meta"]) == 2
-    assert "reserved" in capsys.readouterr().err
+    assert "--budget" in capsys.readouterr().err
     from bench.upstream import make_upstream
-    with pytest.raises(NotImplementedError):
+    monkeypatch.delenv("META_API_KEY")
+    with pytest.raises(RuntimeError):
         make_upstream("meta")
+
+
+def _meta_transport(monkeypatch, statuses, model="muse-spark-1.3", budget=0.0):
+    """MetaUpstream's transport over a scripted network: one status per call, usage of 100k prompt + 10k output tokens."""
+    import asyncio
+    import httpx
+    from bench.upstream import MetaUpstream
+    monkeypatch.setattr(MetaUpstream, "spent_usd", 0.0)
+    monkeypatch.setattr(MetaUpstream, "requests", 0)
+    monkeypatch.setattr(MetaUpstream, "budget_usd", 0.0)
+    monkeypatch.setattr(MetaUpstream, "over_budget", False)
+    calls = []
+
+    def handle(request):
+        calls.append(request)
+        code = statuses[min(len(calls) - 1, len(statuses) - 1)]
+        body = {"model": model, "usage": {"prompt_tokens": 100_000, "completion_tokens": 10_000,
+                                          "prompt_tokens_details": {"cached_tokens": 0}}} if code == 200 else {"error": "x"}
+        return httpx.Response(code, json=body)
+
+    async def no_sleep(_):
+        pass
+    monkeypatch.setattr(asyncio, "sleep", no_sleep)
+    up = MetaUpstream(budget_usd=budget, inner=httpx.MockTransport(handle))
+
+    def send():
+        async def go():
+            async with httpx.AsyncClient(transport=up.transport(), base_url="https://x.invalid") as c:
+                return await c.post("/chat/completions", json={})
+        return asyncio.run(go())
+    return MetaUpstream, send, calls
+
+
+def test_meta_upstream_counts_spend_from_usage_and_retries_rate_limits(monkeypatch):
+    meta, send, calls = _meta_transport(monkeypatch, [429, 503, 200])
+    assert send().status_code == 200 and len(calls) == 3          # two refusals retried, then the answer
+    assert meta.requests == 1 and meta.spent_usd == pytest.approx(0.1 * 1.25 + 0.01 * 4.25)   # 100k in, 10k out
+
+
+def test_meta_upstream_stops_at_the_budget_before_sending(monkeypatch):
+    from bench.upstream import BudgetExceeded
+    meta, send, calls = _meta_transport(monkeypatch, [200], budget=0.15)
+    send()                                                         # $0.1675 spent, over the $0.15 cap
+    with pytest.raises(BudgetExceeded):
+        send()
+    assert len(calls) == 1 and meta.over_budget
 
 
 def test_what_if_shim_closes_the_test_output_gap_at_a_price():

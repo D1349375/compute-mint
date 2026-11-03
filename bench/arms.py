@@ -18,6 +18,7 @@ from fastapi.testclient import TestClient
 
 from compute_mint.app import Config, SessionState, create_app
 from compute_mint.broker import Broker, BrokerConfig
+from compute_mint.labels import Label
 
 from .acceptance import evaluate
 from .agent import AgentRun, run_agent
@@ -88,9 +89,14 @@ def task_record(it: IndexedTask, arm: str, run: AgentRun, accept: dict, rows: li
 def run_arm(spec: ArmSpec, tasks: tuple[IndexedTask, ...], options: RunOptions) -> ArmRun:
     if not spec.executed:
         raise ValueError(f"{spec.name} is analysed, not executed")
-    upstream = make_upstream(options.upstream, cache_block_tokens=options.cache_block_tokens)
+    real = options.upstream == "meta"
+    upstream = make_upstream(options.upstream, **({"budget_usd": options.budget_usd} if real
+                                                  else {"cache_block_tokens": options.cache_block_tokens}))
     recorder = RecordingTransport(upstream.transport())
-    config = Config(api_base="https://mock.invalid/v1", api_key="mock-key-not-a-real-key",
+    # Routing uses `paid` in every mode: it only decides that what is not contributable goes to the Standard lane.
+    # With the real API this is acceptable because every byte of bench data is invented.
+    config = Config(api_base=upstream.api_base if real else "https://mock.invalid/v1",
+                    api_key=upstream.api_key if real else "mock-key-not-a-real-key",
                     contributor_model=CONTRIBUTOR_MODEL, standard_model=STANDARD_MODEL,
                     ledger_path=":memory:", policy_path=":memory:", billing="paid",
                     output_paths=spec.output_paths, fingerprints=spec.fingerprints,
@@ -99,11 +105,17 @@ def run_arm(spec: ArmSpec, tasks: tuple[IndexedTask, ...], options: RunOptions) 
     if spec.strict_tools:
         strict_tool_outputs(app.state.policy)
     client = TestClient(app)
+    if real:
+        client.__enter__()   # one event loop for the whole arm: the real HTTP connections are reused between requests
     repos: dict[str, Repo] = {n: load_repo(n) for n in repo_names()}
     truth = truth_paths(repos, {n: [it.task.id for it in tasks if it.task.repo == n] for n in repos})
-    if spec.learning == "oracle":
+    if spec.learning == "oracle" or spec.public_repo:   # a rule per file from the truth; the strictest label wins over the blanket rule below
         for path, label in truth.items():
             app.state.policy.set_rule(path, label)
+    if spec.public_repo:
+        for name, repo in repos.items():
+            if repo.headers["project"] == "public":
+                app.state.policy.set_rule(f"{mount_for(name)}/*", Label.PUBLIC)
     reviewer = Reviewer(truth, budget=options.reviews_per_task, error_rate=options.reviewer_error_rate,
                         seed=options.seed) if spec.learning == "reviewer" else None
 
@@ -126,9 +138,21 @@ def run_arm(spec: ArmSpec, tasks: tuple[IndexedTask, ...], options: RunOptions) 
             root = Path(tmp)
             write_tree(repo.files, root)
             ws = Workspace(root, mount_for(task.repo))
-            run = run_agent(task, GatewayChat(client, headers), ws)
+            error = ""
+            try:
+                run = run_agent(task, GatewayChat(client, headers), ws)
+            except Exception as e:
+                if not real or upstream.over_budget:
+                    raise
+                run, error = AgentRun(), f"{type(e).__name__}: {str(e)[:300]}"   # a real call failed: the task counts as not passed
             accept = evaluate(task, root, run.final_text)
         rec = task_record(it, spec.name, run, accept, _ledger_rows(app, session))
+        if error:
+            rec["error"] = error
+        if options.progress_path:
+            import json
+            with open(options.progress_path, "a", encoding="utf-8") as fh:
+                fh.write(json.dumps({"arm": spec.name, **rec}, ensure_ascii=False) + "\n")
         out.snapshots[task.id] = run.snapshots
         if reviewer is not None:
             decided = reviewer.review(client, task.id)
@@ -142,6 +166,8 @@ def run_arm(spec: ArmSpec, tasks: tuple[IndexedTask, ...], options: RunOptions) 
     if reviewer is not None:
         out.reviewer_decisions = reviewer.decisions
     out.sent_checks = _cross_check_ledger(app, recorder)
+    if real:
+        client.__exit__(None, None, None)
     return out
 
 

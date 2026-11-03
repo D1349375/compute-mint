@@ -4,11 +4,15 @@
     python -m bench.run --arms standard,mint --tasks T01,T14
     python -m bench.run --arms all,oracle --out bench/sample_results --run-id sample
 
-`--upstream meta` is reserved for the real API and refuses to run in this round. The `naive` arm is
-never executed against any upstream (it is analysed from the Standard arm's recorded histories).
+    python -m bench.run --arms standard,oracle --tasks T07,T09 --upstream meta --budget 2
+
+`--upstream meta` sends the (invented) bench data to the real Meta Model API: the key comes from META_API_KEY
+(`.env` at the repository root is read, nothing is printed) and `--budget` caps the computed spend in USD.
+The `naive` arm is never executed against any upstream (it is analysed from the Standard arm's recorded histories).
 """
 import argparse
 import json
+import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -60,6 +64,10 @@ def run_bench(arms: list[str], options: RunOptions, task_ids: list[str] | None =
         "arms": arm_docs,
         "integrity": {n: runs[n].sent_checks for n in order if ARM_SPECS[n].executed},
     }
+    if options.upstream == "meta":
+        from .upstream import MetaUpstream
+        results["options"]["budget_usd"] = options.budget_usd
+        results["real_upstream"] = {"computed_spend_usd": round(MetaUpstream.spent_usd, 6), "requests": MetaUpstream.requests}
     if "naive" in order:
         results["naive_variants"] = variants(tasks, runs["standard"], options.cache_block_tokens)
     return results
@@ -68,7 +76,8 @@ def run_bench(arms: list[str], options: RunOptions, task_ids: list[str] | None =
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="python -m bench.run", description=__doc__.split("\n")[0])
     p.add_argument("--arms", default="all", help="comma list of: " + ", ".join(ARM_SPECS) + " (all = the five of the spec)")
-    p.add_argument("--upstream", default="mock", choices=["mock", "meta"], help="meta is reserved and refuses to run")
+    p.add_argument("--upstream", default="mock", choices=["mock", "meta"], help="meta = the real Meta Model API (needs META_API_KEY)")
+    p.add_argument("--budget", type=float, default=0.0, help="--upstream meta: stop once the computed spend reaches this many USD")
     p.add_argument("--tasks", default="", help="comma list of task ids or numbers (T01,T14); default all")
     p.add_argument("--limit", type=int, default=0, help="only the first N tasks (of the selection)")
     p.add_argument("--out", default=str(BENCH_DIR / "results"), help="output base directory")
@@ -82,15 +91,23 @@ def main(argv: list[str] | None = None) -> int:
     args = p.parse_args(argv)
 
     if args.upstream == "meta":
-        print("--upstream meta is reserved: no model has been approved yet and this round makes no network calls. "
-              "Use --upstream mock.", file=sys.stderr)
-        return 2
-    options = RunOptions(upstream=args.upstream, cache_block_tokens=args.cache_block, reviews_per_task=args.reviews_per_task,
-                         reviewer_error_rate=args.reviewer_error_rate, seed=args.seed, naive_switch=args.naive_switch)
-    results = run_bench(parse_arms(args.arms), options, [t for t in args.tasks.split(",") if t] or None, args.limit or None)
-
+        from compute_mint.envfile import load_env_file
+        load_env_file(BENCH_DIR.parent / ".env")
+        if not os.environ.get("META_API_KEY"):
+            print("--upstream meta needs META_API_KEY (set it or put it in .env at the repository root).", file=sys.stderr)
+            return 2
+        if args.budget <= 0:
+            print("--upstream meta needs --budget (USD): a cap on the computed spend.", file=sys.stderr)
+            return 2
     run_id = args.run_id or datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
     out_dir = Path(args.out) / run_id
+    options = RunOptions(upstream=args.upstream, cache_block_tokens=args.cache_block, reviews_per_task=args.reviews_per_task,
+                         reviewer_error_rate=args.reviewer_error_rate, seed=args.seed, naive_switch=args.naive_switch,
+                         budget_usd=args.budget, progress_path=str(out_dir / "progress.jsonl") if args.upstream == "meta" else "")
+    if options.progress_path:
+        out_dir.mkdir(parents=True, exist_ok=True)
+    results = run_bench(parse_arms(args.arms), options, [t for t in args.tasks.split(",") if t] or None, args.limit or None)
+
     out_dir.mkdir(parents=True, exist_ok=True)
     write_json(out_dir / "results.json", results)
     write_tables(out_dir, results)

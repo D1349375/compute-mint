@@ -10,6 +10,16 @@ import re
 from .detect import find_spans
 
 PLACEHOLDER = re.compile(r"⟨([A-Z_]+)_(\d+)⟩")
+# A placeholder's brackets written as JSON escapes (backslash-u-2-7-e-8 and ...e-9), unless the backslash is itself escaped.
+ESCAPED_BRACKET = re.compile(r"(?<!\\)((?:\\\\)*)\\u27[eE]([89])")
+# The end of a chunk that may be the start of such an escape: the whole run of backslashes, since only the
+# run's length tells whether the last one starts an escape.
+PARTIAL_ESCAPE = re.compile(r"\\+(?:u(?:2(?:7[eE]?)?)?)?$")
+
+
+def unescape_brackets(text: str) -> str:
+    """Write the placeholder brackets that JSON text spells as escapes as the characters; the JSON stays the same."""
+    return ESCAPED_BRACKET.sub(lambda m: m.group(1) + ("⟨" if m.group(2) == "8" else "⟩"), text)
 
 
 def _json_safe(value: str) -> str:
@@ -56,7 +66,7 @@ class Vault:
         def restore(m: re.Match) -> str:
             value = self._by_placeholder.get(m.group(0))
             return m.group(0) if value is None else _json_safe(value)
-        return PLACEHOLDER.sub(restore, text)
+        return PLACEHOLDER.sub(restore, unescape_brackets(text))
 
     def may_become_placeholder(self, tail: str) -> bool:
         """Whether `tail` is the start of a placeholder this vault can restore."""
@@ -70,19 +80,24 @@ class StreamRestorer:
     """Rehydrates text that arrives in pieces: a tail that may still become a placeholder is held back."""
 
     def __init__(self, vault: Vault | None, json_text: bool = False) -> None:
-        self.vault, self.held = vault, ""
+        self.vault, self.held, self.json_text = vault, "", json_text
         self.restore = None if vault is None else vault.rehydrate_json if json_text else vault.rehydrate
 
     def feed(self, text: str) -> str:
         if self.vault is None:
             return text
-        text = self.held + text
+        text, partial = self.held + text, ""
+        if self.json_text:
+            text = unescape_brackets(text)
+            cut = PARTIAL_ESCAPE.search(text)
+            if cut:
+                text, partial = text[:cut.start()], cut.group(0)
         start = text.rfind("⟨")
         tail = text[start:] if start >= 0 else ""
         if tail and self.vault.may_become_placeholder(tail):
-            self.held, text = tail, text[:start]
+            self.held, text = tail + partial, text[:start]
         else:
-            self.held = ""
+            self.held = partial
         return self.restore(text)
 
     def flush(self) -> str:

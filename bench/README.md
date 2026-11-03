@@ -143,6 +143,7 @@ compact (the solver then re-reads).
 | `mint_broker` | `mint` + Context Broker |
 | `mint_learn` | `mint_broker` + the review queue answered by a simulated reviewer from the truth labels (default: up to 2 decisions after each task; it generalizes a folder only if every file in it has the same answer) |
 | `oracle` (extra) | `mint_broker` with every path rule preloaded from the truth: the ceiling for learning |
+| `contrib` (extra) | for **real-model runs only**: `mint_broker` with the true label of every file as a rule (as `oracle`), the rest of the public repository declared public, and output-path and fingerprint labeling off, so everything public goes to Contributor and a request that holds a non-public file (an unannounced codename in a draft) still goes to Standard. It exists to compare Contributor with Standard on the same tasks, not to measure routing |
 | `mint_strict` (extra) | `mint_learn` plus a **what-if shim** (`shims.py`, no gateway change): tool output that names no file is treated as unreviewed |
 | `learn_nofix` (extra) | arm 5 on the gateway as it was before the leak fix (`output_paths` and `fingerprints` off): reproduces the old arm 5 exactly |
 | `learn_paths`, `learn_fp` (extra) | arm 5 with only the paths-in-output mechanism, or only the content fingerprints (ablation) |

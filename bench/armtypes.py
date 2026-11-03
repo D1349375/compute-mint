@@ -17,6 +17,7 @@ class ArmSpec:
     all_standard: bool = False
     broker: bool = False
     learning: str = "none"         # none | reviewer | oracle
+    public_repo: bool = False      # every file of a public repository is declared public (model comparison, not learning)
     strict_tools: bool = False     # what-if: distrust tool output that names no file (bench/shims.py)
     extra: bool = False            # not part of `--arms all`
     output_paths: bool = True      # gateway: label tool output by the paths it names
@@ -31,6 +32,8 @@ ARM_SPECS = {
     "mint_broker": ArmSpec("mint_broker", "4. Compute Mint + Context Broker", broker=True),
     "mint_learn": ArmSpec("mint_learn", "5. Mint + Broker + rule learning", broker=True, learning="reviewer"),
     "oracle": ArmSpec("oracle", "6. Mint + Broker + oracle rules (ceiling, extra)", broker=True, learning="oracle", extra=True),
+    "contrib": ArmSpec("contrib", "8. Mint + Broker, public repository on Contributor except files that are not public (real-model comparison, extra)",
+                       broker=True, public_repo=True, extra=True, output_paths=False, fingerprints=False),
     "mint_strict": ArmSpec("mint_strict", "7. Arm 5 + distrust tool output without a file (what-if, extra)", broker=True,
                            learning="reviewer", strict_tools=True, extra=True),
     # ablations of the leak fix on arm 5's setup (extra): nofix reproduces the gateway before the fix
@@ -56,6 +59,8 @@ class RunOptions:
     reviewer_error_rate: float = 0.0
     seed: int = 1
     naive_switch: str = "mid"
+    budget_usd: float = 0.0        # --upstream meta: stop sending once the computed spend reaches this
+    progress_path: str = ""        # --upstream meta: one JSON line per finished task, so a stopped run keeps its results
 
 
 @dataclass
