@@ -28,7 +28,8 @@ PATTERNS: dict[str, re.Pattern] = {
         r"(?i)(?:api[_-]?key|secret|password|passwd|token|密碼|密码|金鑰|密鑰|密钥|權杖|令牌|口令)[\"']?\s*[:=]\s*[\"']?(?P<v>[A-Za-z0-9_\-./+]{12,})"
     ),
     "EMAIL": _ascii(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b"),
-    "TW_PHONE": _ascii(r"(?<!\d)09\d{2}[- ]?\d{3}[- ]?\d{3}(?!\d)"),
+    # local mobile form 09xx-xxx-xxx, and the international form +886 9xx xxx xxx
+    "TW_PHONE": _ascii(r"(?<![\d+])(?:\+886[- ]?9\d{2}|09\d{2})[- ]?\d{3}[- ]?\d{3}(?!\d)"),
     "TW_ID": _ascii(WORD_START + r"[A-Z][12]\d{8}\b"),
     "CARD": _ascii(r"(?<!\d)(?:\d{4}[- ]){3}\d{4}(?!\d)"),
 }

@@ -41,6 +41,15 @@ def test_detects_credentials_and_personal_data():
     assert find_spans("contact noreply@example.com") == []
 
 
+def test_detects_international_taiwan_mobile_numbers():
+    # found by the live Codex run: "+886 912 345 678" went to Contributor unmasked, only "09xx" was detected
+    for number in ("+886 912 345 678", "+886-912-345-678", "+886912345678", "0912 345 678"):
+        spans = find_spans(f"call {number} today")
+        assert [s.kind for s in spans] == ["TW_PHONE"] and spans[0].text == number, number
+    assert find_spans("order 1886912345678 shipped") == []      # not glued to a longer number
+    assert find_spans("price +886 12 345 678") == []            # not a mobile number
+
+
 def test_vault_is_consistent_and_reversible():
     v = Vault()
     a, n = v.mask(f"use {KEY} then {KEY} and mail {EMAIL}")
