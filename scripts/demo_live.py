@@ -12,7 +12,7 @@ and results.json under --out.
 Needs Python 3.12 with playwright (chromium installed) and httpx, the gateway venv (gateway/.venv), a built
 dashboard (cd dashboard && npm install && npm run build), the real Codex CLI, and META_API_KEY in
 compute-mint/.env. The key is read by this script only to hand it to the gateway process; it is never printed or
-logged, and the Codex process does not get it. See docs/DEMO_LIVE.md for what is real and what is staged.
+logged, and the Codex process does not get it. See docs/BUILD_LOG.md (2026-11-04, live run) for what is real, what is staged and what went wrong.
 
 The target is a public MIT repository of the author (D1349375/quant-strategy-dev-skill), cloned to --demo-dir.
 Codex changes only that local clone; its push URL is disabled. Three things in the clone are staged, on purpose:
