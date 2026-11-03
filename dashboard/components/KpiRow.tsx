@@ -1,13 +1,15 @@
+import { cloudMultiplier, type CloudMultiplier } from "@/lib/compute";
 import { int, pct, times, usd } from "@/lib/format";
 import type { Strings } from "@/lib/i18n";
-import type { Summary } from "@/lib/types";
+import type { RequestRow, Summary } from "@/lib/types";
 
-export default function KpiRow({ summary, t }: { summary: Summary | null; t: Strings }) {
+export default function KpiRow({ summary, rows, t }: { summary: Summary | null; rows: RequestRow[]; t: Strings }) {
   if (!summary) return <section className="kpis skeleton" aria-busy />;
   const s = summary;
   const savedShare = s.counterfactual_usd > 0 ? s.saved_usd / s.counterfactual_usd : 0;
   const paidW = s.counterfactual_usd > 0 ? Math.max((s.spent_usd / s.counterfactual_usd) * 100, 0.8) : 0;
   const stayed = s.local_requests + s.held_requests;
+  const mult = multiplierCard(cloudMultiplier(s, rows), t);
   return (
     <section className="kpis">
       <article className="card kpi hero">
@@ -34,7 +36,7 @@ export default function KpiRow({ summary, t }: { summary: Summary | null; t: Str
           </div>
         </div>
       </article>
-      <Kpi label={t.multiplier} value={times(s.effective_compute_multiplier)} sub={t.multiplierSub} accent />
+      <Kpi label={t.multiplier} value={times(mult.value)} sub={mult.sub} accent />
       <Kpi label={t.eShare} value={pct(s.contributable_token_share)} sub={t.eSub} />
       <Kpi label={t.cacheHit} value={pct(s.cache_hit_rate)} sub={t.cacheSub} />
       <Kpi label={t.creditsUsed} value={usd(s.credits_usd)} sub={t.creditsSub} />
@@ -46,6 +48,12 @@ export default function KpiRow({ summary, t }: { summary: Summary | null; t: Str
       />
     </section>
   );
+}
+
+function multiplierCard(m: CloudMultiplier, t: Strings): { value: number | null; sub: string } {
+  const sub =
+    m.kind === "gateway" ? t.multiplierSub : m.kind === "truncated" ? t.multiplierTruncated : t.multiplierCloud(m.localRequests, usd(m.localCf));
+  return { value: m.value, sub };
 }
 
 function Kpi({ label, value, sub, unit, accent }: { label: string; value: string; sub: string; unit?: string; accent?: boolean }) {
