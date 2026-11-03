@@ -121,7 +121,7 @@ wire_api = "responses"
 http_headers = { "x-cm-client" = "openai", "x-cm-project" = "public", "x-cm-session" = "my-repo", "x-cm-root" = "/abs/path/of/my-repo" }
 ```
 
-Checked with a real client: codex-cli 0.163.0-alpha.10.2, read-only sandbox, a throwaway `CODEX_HOME`, on a scripted mock upstream (no real model). Codex warns that it has no metadata for `muse-spark-1.3` and goes on. On a `held` answer the turn fails and shows the reason. Not yet checked against the real Meta API.
+Checked with a real client: codex-cli 0.163.0-alpha.10.2, read-only sandbox, a throwaway `CODEX_HOME`, on a scripted mock upstream (no real model). Codex warns that it has no metadata for `muse-spark-1.3` and goes on. On a `held` answer the turn fails and shows the reason. Checked against the real Meta API with `python -m demo.real_smoke` (see `docs/BUILD_LOG.md`, 2026-11-04), not yet with Codex itself.
 
 Without `x-cm-session` the session is a hash of the instructions, so Codex sessions with the same instructions share one vault and provenance. Without `x-cm-root` relative paths are placed from `<cwd>` in the first user message, else treated as unreviewed. Expect `held` on credits as soon as a file with no rule is read: answer the review queue (`GET /v1/review`) or configure a local model.
 

@@ -31,6 +31,16 @@ Regardless of any user setting, Compute Mint never routes personal information (
 
 Standard is private only when the account pays. Use paid with promotional credits (hackathon credits included) counts as non-paid under the Terms (§13.3), and every non-paid request may be used for training (§6), on Standard models too. So by default (`CM_BILLING=credits`) whatever may not go to Contributor stays on this machine: it runs on a local model if one is configured and is held back otherwise. All live runs during the hackathon use credits and invented data only.
 
+## Which numbers are real
+
+| Numbers | Source |
+|---|---|
+| 8.8% of agent tokens contributable under a naive switch, about 42x discount | Analysis of the author's own 683 local sessions (aggregates only); list prices |
+| Every figure in `bench/sample_results/` (e, acceptance, compute multiplier, canary violations, learning curve) | **Mock upstream**: a scripted model, character-based token estimates, a simulated prefix cache. Reproducible offline, byte for byte |
+| Smoke test of the gateway, and the Contributor-vs-Standard run below | **Real Meta Model API** (`muse-spark-1.3`, `muse-spark-1.3-contributor`), invented bench data only. Costs are computed from the `usage` the API returned and the list prices, not read from an invoice |
+
+Real Contributor-vs-Standard run (2026-11-04, 15 tasks of the public bench repository, 3 repetitions, same agent loop through the gateway; details in `docs/BUILD_LOG.md`): all Standard 42/45 tasks accepted for $1.14; Contributor where the gateway allows it 44/45 for $0.46, **2.5x** cheaper over all 45 sessions, and **14.6x** cheaper on the 33 sessions that stayed entirely on Contributor (33/33 accepted). The accepted-task difference (44 vs 42) is within what repeated runs of the same model vary by and says nothing about Contributor being better. Known limits: 15 tasks (3 with Chinese prompts), one repository, one model version; the 12 sessions that touched resumed foreign-model context or an unannounced draft went partly to Standard, which on `credits` billing would have been held or run on a local model.
+
 ## License
 
 TBD

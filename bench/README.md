@@ -8,9 +8,11 @@ Acceptance tasks and measurement tools for Compute Mint. It answers, with number
 - prompt-cache hits and the Context Broker's compression,
 - and whether anything that must not reach Contributor did (**canary violations**, target 0).
 
-This round everything runs against a **mock upstream**. `--upstream meta` is reserved; it refuses to run.
-Nothing in bench opens a network connection (a test blocks every non-loopback connection and runs the
-bench under it).
+Everything committed in `sample_results/` ran against a **mock upstream**, and the default stays `--upstream mock`:
+no network connection (a test blocks every non-loopback connection and runs the bench under it).
+`--upstream meta` sends the invented bench data to the real Meta Model API (key in `META_API_KEY`, `--budget`
+is required and stops the run at that computed spend); its results are not committed, the numbers are in
+`docs/BUILD_LOG.md`. Compare real runs with `python -m bench.realsummary <run dirs>`.
 
 ```bash
 cd <repo>
