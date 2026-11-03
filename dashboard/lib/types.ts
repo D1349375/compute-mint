@@ -92,6 +92,13 @@ export interface BenchArm {
   cache_hit_rate: number | null;
 }
 
+/** A review decision the page saw happen: the rule count grew between two polls (the gateway keeps no decision time). */
+export interface ReviewMark {
+  ts: number; // seconds, like the ledger
+  rules: number; // rule count after the decision
+  added: number;
+}
+
 // One row of bench/sample_results/reference-run/learning_curve.csv (x axis: task order within an arm).
 export interface CurvePoint {
   index: number;

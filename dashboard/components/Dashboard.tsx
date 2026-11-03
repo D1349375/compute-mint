@@ -118,8 +118,8 @@ export default function Dashboard({ bench }: { bench: BenchEvidence | null }) {
       <KpiRow summary={data.summary} rows={rows} t={t} />
 
       <section className="grid one-two">
-        <SameDollar bench={bench} t={t} />
-        <FlywheelPanel bench={bench} t={t} />
+        <SameDollar summary={data.summary} rows={rows} bench={bench} t={t} />
+        <FlywheelPanel bench={bench} rows={rows} total={data.page?.total ?? rows.length} review={data.review} marks={data.marks} lang={lang} t={t} />
       </section>
 
       <section className="grid two-one">

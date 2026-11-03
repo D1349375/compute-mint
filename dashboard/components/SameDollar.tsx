@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 
+import { cloudMultiplier } from "@/lib/compute";
+import { times, usd } from "@/lib/format";
 import type { Strings } from "@/lib/i18n";
-import { times } from "@/lib/format";
-import type { BenchArm, BenchEvidence } from "@/lib/types";
+import type { BenchEvidence, RequestRow, Summary } from "@/lib/types";
 
 const GROW_MS = 1400;
 
@@ -29,49 +30,64 @@ function useCountUp(value: number): number {
   return v;
 }
 
-const pick = (bench: BenchEvidence, key: string): BenchArm | undefined => bench.arms.find((a) => a.arm === key);
+/**
+ * Standard-priced cost against cost paid, from the live ledger and with the same definition as the KPI card
+ * (local requests are not counted as free). The bench's multiplier for Mint with rule learning is a reference tick.
+ */
+export default function SameDollar({ summary, rows, bench, t }: {
+  summary: Summary | null; rows: RequestRow[]; bench: BenchEvidence | null; t: Strings;
+}) {
+  const m = summary ? cloudMultiplier(summary, rows) : null;
+  const x = m?.value ?? 0;
+  const learn = bench?.arms.find((a) => a.arm === "mint_learn");
+  const ref = learn?.compute_multiplier ?? null;
+  const top = Math.max(x, ref ?? 0, 1);
+  const shown = useCountUp(x);
+  const note = m
+    ? m.kind === "cloud"
+      ? t.multiplierCloud(m.localRequests, usd(m.localCf))
+      : m.kind === "truncated"
+        ? t.multiplierTruncated
+        : null
+    : null;
 
-export default function SameDollar({ bench, t }: { bench: BenchEvidence | null; t: Strings }) {
-  const std = bench && pick(bench, "standard");
-  const mint = bench && pick(bench, "mint_learn");
-  const ok = !!(bench && std && mint && std.compute_multiplier && mint.compute_multiplier && std.paid_usd && mint.paid_usd);
-  // Multipliers come from the bench summaries (counterfactual ÷ paid); tasks per $1 is passed ÷ paid.
-  const stdX = ok ? std.compute_multiplier! : 0;
-  const mintX = ok ? mint.compute_multiplier! : 0;
-  const stdTasks = ok ? (std.passed ?? 0) / std.paid_usd! : 0;
-  const mintTasks = ok ? (mint.passed ?? 0) / mint.paid_usd! : 0;
-  const countX = useCountUp(mintX);
-  const countTasks = useCountUp(mintTasks);
-  if (!bench || !ok) return null;
-  const rows = [
-    { key: "std", label: t.dollarStandard, x: stdX, shownX: stdX, tasks: stdTasks, arm: std! },
-    { key: "mint", label: t.dollarMint, x: mintX, shownX: countX, tasks: countTasks, arm: mint! },
-  ];
   return (
     <section className="card dollar">
       <div className="card-head">
-        <div>
-          <h2>{t.dollarTitle}</h2>
-          <p className="sub">{t.dollarSub(bench.tasks, bench.upstream)}</p>
-        </div>
-        <span className="tag">{t.flyMock(bench.upstream)}</span>
+        <h2>{t.dollarTitle}</h2>
       </div>
-      <div className="dollar-rows">
-        {rows.map((r, i) => (
-          <div key={r.key} className={`dollar-row${r.key === "mint" ? " is-mint" : ""}`}>
-            <div className="dollar-label">
-              <span>{r.label}</span>
-              <span className="muted">{t.dollarAccept(r.arm.passed ?? 0, r.arm.tasks)}</span>
+      <p className="sub">{t.dollarSub}</p>
+      {x > 0 ? (
+        <>
+          <div className="dollar-rows">
+            <div className="dollar-row">
+              <div className="dollar-label"><span>{t.dollarStandard}</span></div>
+              <div className="dollar-track">
+                <span className="dollar-fill" style={{ width: `${(1 / top) * 100}%` }} />
+                <span className="dollar-val">{times(1)}</span>
+              </div>
             </div>
-            <div className="dollar-track">
-              <span className="dollar-fill" style={{ width: `${(r.x / mintX) * 100}%`, animationDelay: `${i * 0.25}s` }} />
-              <span className="dollar-val">{times(r.shownX)}</span>
+            <div className="dollar-row is-mint">
+              <div className="dollar-label"><span>{t.dollarMint}</span></div>
+              <div className="dollar-track">
+                <span className="dollar-fill" style={{ width: `${(x / top) * 100}%`, animationDelay: "0.25s" }} />
+                <span className="dollar-val">{times(shown)}</span>
+                {ref != null && ref > 0 && (
+                  <span className="dollar-ref" style={{ left: `${(ref / top) * 100}%` }} title={t.dollarBenchNote(times(ref))}>
+                    <i />
+                    <b>{t.dollarBenchRef(times(ref), bench?.tasks ?? 0, bench?.upstream ?? "")}</b>
+                  </span>
+                )}
+              </div>
             </div>
-            <div className="dollar-tasks">{t.dollarTasks(Math.round(r.tasks))}</div>
           </div>
-        ))}
-      </div>
-      <p className="dollar-more">{t.dollarMore(Math.round((mintX / stdX - 1) * 100))}</p>
+          <p className="dollar-more">{t.dollarPaid(usd(1 / x))}</p>
+          {ref != null && <p className="dollar-note">{t.dollarBenchNote(times(ref))}</p>}
+          {note && <p className="dollar-note">{note}</p>}
+        </>
+      ) : (
+        <p className="empty">{t.dollarNone}</p>
+      )}
     </section>
   );
 }

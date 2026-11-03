@@ -231,14 +231,17 @@ td.reason { color: var(--text-2); font-size: 13px; min-width: 280px; }
 .tag { flex: none; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; padding: 3px 10px; border-radius: 999px; background: var(--primary-soft); color: var(--primary-ink); white-space: nowrap; }
 
 .dollar { display: flex; flex-direction: column; }
-.dollar-rows { display: flex; flex-direction: column; gap: 28px; margin-top: 18px; }
+.dollar-rows { display: flex; flex-direction: column; gap: 44px; margin-top: 18px; }
 .dollar-label { display: flex; justify-content: space-between; gap: 12px; font-weight: 650; margin-bottom: 8px; flex-wrap: wrap; }
-.dollar-label .muted { font-weight: 500; font-size: 14px; }
-.dollar-track { position: relative; height: 64px; background: var(--surface-2); border-radius: 12px; overflow: hidden; }
+.dollar-track { position: relative; height: 64px; background: var(--surface-2); border-radius: 12px; }
 .dollar-fill { position: absolute; inset: 0 auto 0 0; background: #b9c4d3; border-radius: 12px; transform-origin: left; animation: grow 1.4s cubic-bezier(0.22, 1, 0.36, 1) both; }
 .is-mint .dollar-fill { background: linear-gradient(90deg, #3d8bff, var(--primary)); }
 .dollar-val { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); font-size: 30px; font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: var(--text); }
 .is-mint .dollar-val { color: #fff; }
+.dollar-ref { position: absolute; top: 0; bottom: 0; width: 0; }
+.dollar-ref i { position: absolute; top: -4px; bottom: -4px; left: -1px; border-left: 2px dashed var(--text); }
+.dollar-ref b { position: absolute; top: calc(100% + 10px); left: 6px; font-size: 12px; font-weight: 650; color: var(--text-2); white-space: nowrap; }
+.dollar-note { margin: 6px 0 0; font-size: 13px; color: var(--muted); }
 .dollar-tasks { margin-top: 8px; font-size: 18px; font-weight: 650; color: var(--text-2); font-variant-numeric: tabular-nums; }
 .dollar-more { margin: auto 0 0; padding-top: 24px; font-size: 20px; font-weight: 700; color: var(--primary-ink); }
 @keyframes grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
@@ -261,6 +264,10 @@ td.reason { color: var(--text-2); font-size: 13px; min-width: 280px; }
 .fly-tip { width: 240px; }
 .fly-tip-row { display: flex; justify-content: space-between; gap: 8px; margin-top: 3px; }
 .fly-tip-row i { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 4px; }
+.mark-line { stroke: var(--primary-ink); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.lane-dot { fill: var(--lane); }
+.flywheel .seg { flex: none; }
+.flywheel .card-head { align-items: center; flex-wrap: wrap; }
 .fly-note { margin: 10px 0 0; font-size: 14px; color: var(--text-2); }
 .fly-note strong { color: var(--text); }
 

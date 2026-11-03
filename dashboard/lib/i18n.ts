@@ -96,6 +96,20 @@ const en = {
   notExecuted: "simulated, not sent",
   benchMissing: "Bench results not found.",
 
+  flyTabLive: "Live ledger",
+  flyTabBench: "Bench evidence · mock upstream",
+  liveSub: (n: number) =>
+    `Cumulative e, the share of tokens served by Contributor, over the ${n} requests in the ledger in the order they arrived. The dots under the plot are the lanes. A vertical line is a review decision seen while this page was open.`,
+  liveTruncated: (shown: number, total: number) => `Showing the newest ${shown} of ${total} requests.`,
+  liveRules: (rules: number, pending: number) => `${rules} rules learned · ${pending} paths waiting for review`,
+  liveMark: (added: number) => `+${added} rule${added === 1 ? "" : "s"}`,
+  liveNoMarks:
+    "No review decision seen yet. Decide in the review queue, resend the held session (see the README) and the curve moves from there.",
+  liveEmpty: "Not enough requests in the ledger yet.",
+  liveTip: (n: number, time: string) => `request ${n} · ${time}`,
+  liveE: "e so far",
+  liveAxisX: "request order",
+
   flyTitle: "The more you review, the more can go to Contributor",
   flySub: (tasks: number, upstream: string, reviews: number) =>
     `Share of tokens served by Contributor (e), cumulative over ${tasks} tasks in the order they ran. Each review decision becomes a rule; ${reviews} decisions in this run. Bench on a ${upstream} upstream, not measured on the real API.`,
@@ -116,13 +130,13 @@ const en = {
   flyFinal: (name: string) => `${name}, final`,
 
   dollarTitle: "Same $1, more work done",
-  dollarSub: (tasks: number, upstream: string) =>
-    `Bench: ${tasks} tasks, all accepted in both arms, ${upstream} upstream. Multiplier = all-Standard cost ÷ cost paid.`,
+  dollarSub: "Live ledger: the Standard price of the requests that were billed, against what was paid. Local requests are left out, not counted as free.",
   dollarStandard: "All Standard",
-  dollarMint: "Compute Mint + rule learning",
-  dollarTasks: (n: number) => `≈ ${n} tasks per $1`,
-  dollarMore: (p: number) => `+${p}% more work for the same money`,
-  dollarAccept: (passed: number, tasks: number) => `${passed}/${tasks} accepted`,
+  dollarMint: "Compute Mint (this ledger)",
+  dollarPaid: (usd: string) => `$1 of Standard-priced work cost ${usd}`,
+  dollarNone: "No billed requests in this view yet.",
+  dollarBenchRef: (x: string, tasks: number, upstream: string) => `bench ${x} (${tasks} tasks, ${upstream} upstream)`,
+  dollarBenchNote: (x: string) => `The tick is the bench reference, Mint with rule learning at ${x}; see the Bench tab.`,
 
   footer:
     "Compute Mint · invented demo data from bench/materials · not affiliated with or endorsed by any model provider.",
@@ -222,6 +236,19 @@ const zh: Strings = {
   notExecuted: "僅模擬，未送出",
   benchMissing: "找不到 bench 結果。",
 
+  flyTabLive: "即時帳本",
+  flyTabBench: "Bench 證據 · mock 上游",
+  liveSub: (n: number) =>
+    `帳本中 ${n} 筆請求依到達順序累計的 e（由 Contributor 處理的 token 比例）。圖下方的圓點是各請求的通道；垂直線是這個頁面開著時看到的審核決定。`,
+  liveTruncated: (shown: number, total: number) => `只顯示最新 ${shown} 筆，共 ${total} 筆。`,
+  liveRules: (rules: number, pending: number) => `已學到 ${rules} 條規則 · ${pending} 個路徑待審`,
+  liveMark: (added: number) => `+${added} 條規則`,
+  liveNoMarks: "還沒看到審核決定。在審核佇列做決定後重送被擋的 session（見 README），曲線會從那裡開始變化。",
+  liveEmpty: "帳本裡的請求還不夠多。",
+  liveTip: (n: number, time: string) => `第 ${n} 筆請求 · ${time}`,
+  liveE: "目前的 e",
+  liveAxisX: "請求順序",
+
   flyTitle: "審得越多，能送 Contributor 的比例越高",
   flySub: (tasks: number, upstream: string, reviews: number) =>
     `由 Contributor 處理的 token 比例（e），依執行順序在 ${tasks} 個任務上累計。每個審核決定會變成一條規則，這次共 ${reviews} 個決定。此為 ${upstream} 上游的 bench，不是真實 API 的量測。`,
@@ -242,13 +269,13 @@ const zh: Strings = {
   flyFinal: (name: string) => `${name}（最終）`,
 
   dollarTitle: "同樣 $1，完成更多工作",
-  dollarSub: (tasks: number, upstream: string) =>
-    `Bench：${tasks} 個任務，兩組都全數通過驗收，${upstream} 上游。倍數 = 全 Standard 成本 ÷ 實際花費。`,
+  dollarSub: "即時帳本：有計費的請求，其 Standard 價與實際花費的比較。本機請求不計入，不當成免費。",
   dollarStandard: "全 Standard",
-  dollarMint: "Compute Mint + 規則學習",
-  dollarTasks: (n: number) => `≈ 每 $1 完成 ${n} 個任務`,
-  dollarMore: (p: number) => `同樣的錢多做 ${p}% 的工作`,
-  dollarAccept: (passed: number, tasks: number) => `通過 ${passed}/${tasks}`,
+  dollarMint: "Compute Mint（這份帳本）",
+  dollarPaid: (usd: string) => `Standard 價 $1 的工作，實際花 ${usd}`,
+  dollarNone: "這個範圍還沒有計費的請求。",
+  dollarBenchRef: (x: string, tasks: number, upstream: string) => `bench ${x}（${tasks} 個任務，${upstream} 上游）`,
+  dollarBenchNote: (x: string) => `刻度線是 bench 的參考值，Mint 加規則學習 ${x}；見 Bench 分頁。`,
 
   footer: "Compute Mint · demo 資料取自 bench/materials 的虛構內容 · 與任何模型供應商無隸屬或背書關係。",
 };

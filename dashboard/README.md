@@ -6,7 +6,7 @@ went and why, the exact masked context that left the machine, the review queue, 
 ![overview](docs/screenshots/01-overview-1920x1080.png)
 
 It reads the gateway through a same-origin proxy (`app/api/gw/[...path]`) that forwards only the read-only views and
-the review decision, and it reads `bench/sample_results/reference-run/results.json` and `learning_curve.csv` on the server. It calls no model.
+the review decision, and it reads `bench/sample_results/reference-run/results.json` and `learning_curve.csv` on the server for the bench evidence. It calls no model.
 
 ## Run the demo (no API key, no network)
 
@@ -69,8 +69,9 @@ request and that on credits only Contributor requests reached the mock Meta host
 | Billing mode | `GET /v1/status`: `credits` or `paid`, and where non-contributable requests go |
 | Saved, e, cache hit, credits used, stayed local | `GET /v1/ledger/summary` (`?session=` with the session filter) |
 | Effective compute × | Recomputed on the page from the request rows, see "The compute × figure" below |
-| Same $1 | `summaries` of the bench reference run (arms 1 and 5) |
-| Flywheel curve | `learning_curve.csv` of the bench reference run (arms 1, 3, 5, 6) |
+| Same $1 | `GET /v1/ledger/summary` and the request rows, same definition as the compute × card; bench 1.66× as a reference tick |
+| Flywheel, live | `GET /v1/ledger/requests` (cumulative e), `GET /v1/review` (rules, pending); decision lines noticed by the page |
+| Flywheel, bench | `learning_curve.csv` of the bench reference run (arms 1, 3, 5, 6) |
 | Where requests went, timeline, requests table | `GET /v1/ledger/requests` (newest 500 rows) |
 | What left this machine | `GET /v1/ledger/requests/{id}`: `sent_payload` of a Contributor request, placeholders highlighted. Defaults to the newest one with masked values; click a Contributor row or dot to show another |
 | Review queue | `GET /v1/review`, `POST /v1/review/{id}`. Paths that share a suggested pattern are shown together, because one decision settles all of them |
@@ -84,7 +85,7 @@ counterfactual; a held request has neither. Amounts in the demo are cents becaus
 
 The gateway's `effective_compute_multiplier` is counterfactual ÷ spent over all requests. A local request spends $0
 but keeps its Standard price in the counterfactual, so every local request raises the multiplier without any model
-discount being involved: the seed data shows **9.11×** this way. The page therefore recomputes it over the requests
+discount being involved: the seed data shows **9.11×** this way. The page therefore recomputes it (`lib/compute.ts`) over the requests
 that were billed, Contributor and Standard (6.14× on the seed data), and the card says how many local requests it
 left out and what they would have cost on Standard. Held requests have neither cost nor counterfactual. The
 gateway is unchanged and `/v1/ledger/summary` still returns 9.11×.
@@ -94,22 +95,38 @@ local request, the card shows the gateway's figure (the first case with a warnin
 recomputed number is inflated by the seed's tiny, very discounted Contributor requests; the figure to quote is the
 bench's, below.
 
-### Same $1 and the flywheel (bench evidence, mock upstream)
+### Same $1 and the flywheel
 
-Both panels sit under the KPIs and are labeled with the bench's upstream (`mock`): they show how routing, masking and
-rule learning change cost on 37 synthetic tasks, not a measurement on the real API.
+Both panels sit under the KPIs and are built from the live ledger, through the same read-only proxy as the rest of
+the page, so seed data and later real runs show up in them without any change.
 
-- **Same $1**: all Standard 1.00× against Mint + Broker + rule learning 1.66× (`compute_multiplier` of arms 1 and
-  5, the same numbers as the bench table), 37/37 accepted in both. "Tasks per $1" is passed tasks ÷ paid dollars of
-  the bench run ($0.1916 and $0.1156), so it is the same ratio again. The bars grow and the numbers count up once on
-  load (not with `prefers-reduced-motion`).
-- **Flywheel**: cumulative e (share of tokens served by Contributor) against task order for all Standard, Mint,
-  Mint + rule learning and the oracle ceiling (every path rule known from the start). End points are the summary's
-  0.0%, 9.8%, 48.5% and 52.9%. Bars under the plot are the review decisions made during each task (growth of
-  `rules_learned`; 35 in all), and the shaded stretch ends at the task by which 91% of them were made. The curve is
-  not a smooth climb: the first tasks swing because few have run, and the task mix is not uniform, so the caption
-  says to read the end points. What it shows is that Mint without rules stays near 10% while the arm that learns
-  from review decisions reaches the oracle's neighbourhood. Hover for the values of one task.
+- **Same $1** (`components/SameDollar.tsx`): all Standard 1.00× against Compute Mint at the multiplier of the ledger
+  in view, 6.14× on the seed data. It is the KPI card's number (`lib/compute.ts`: the Standard price of the billed
+  requests ÷ what was paid, local requests left out, not counted as free), and the card says how many local requests
+  were left out. "$1 of Standard-priced work cost $0.16" is 1 ÷ that multiplier. The dashed tick is the bench's
+  1.66× (Mint + Broker + rule learning, `summaries` of the reference run, 37 tasks, mock upstream) as a reference:
+  the seed's tiny, strongly discounted sessions are not a realistic mix, the bench is. The bars grow and the number
+  counts up once on load (not with `prefers-reduced-motion`). Source: `/v1/ledger/summary`, `/v1/ledger/requests`.
+- **Flywheel, Live ledger tab** (default, `components/FlywheelPanel.tsx`): cumulative e over the ledger's requests in
+  the order they arrived, e being the gateway's definition (tokens served by Contributor ÷ all tokens), so the last
+  point equals the Contributable tokens KPI. The dots under the plot are the lanes. Source: `/v1/ledger/requests`
+  (newest 500, the page says when the ledger is longer) and `/v1/review` (rules learned, paths waiting). A vertical
+  line marks a review decision **seen while the page was open**: the gateway stores no decision time, so the page
+  notes when the rule count grows between two polls (every four seconds) and puts the line between the requests
+  before and after it. Decisions made before the page was opened, such as the two in the seed, are in the rule count
+  but have no line, and reloading forgets the lines. Press **Public** on a queued path, run `demo.seed --replay`, and
+  the line and the new requests appear. What this gives is the shape of a session as it happens; it is not a
+  controlled experiment, so the curve can fall as well as rise (on the seed it falls once the local-model requests of the
+  last phase arrive, because their tokens count in the denominator).
+- **Flywheel, Bench evidence tab** (`components/BenchCurve.tsx`): the bench's `learning_curve.csv`, cumulative e per
+  task for all Standard, Mint, Mint + rule learning and the oracle ceiling (every path rule known from the start).
+  End points are the summary's 0.0%, 9.8%, 48.5% and 52.9%. Bars under the plot are the review decisions made in each
+  task (growth of `rules_learned`; 35 in all) and the shaded stretch ends at the task by which 91% of them were made.
+  This is the controlled version: same 37 tasks, mock upstream, only the rules differ. The first tasks swing because
+  few have run and the task mix is not uniform, so read the end points, not the slope. Hover for one task's values.
+
+For the gateway: a `decided_at` column on `rules` (or the decided rows of `review`), returned by `/v1/review`,
+would let the page draw decisions made before it was opened and survive a reload. Nothing in the page needs it yet.
 
 ### Recording mode: `?present=1`
 
@@ -126,8 +143,9 @@ provider logo or trademark is used. Lane colors were checked with a color-vision
 also labeled in text. Built for a 1920×1080 recording; works down to phone width.
 
 Screenshots: `docs/screenshots/` (01 overview at 1920×1080, 02 full page, 03 full page in Traditional Chinese,
-04 phone width in Chinese, 05 after a review decision and `--replay` (made before the compute × change), 06 and 07
-same $1 and flywheel in English and Chinese, 08 and 09 recording mode).
+04 phone width in Chinese, 05 after a review decision and `--replay`: the decision line on the live curve, 06 and 07
+same $1 and live flywheel in English and Chinese, 08 and 09 recording mode, 10 the Bench evidence tab, 11 the
+flywheel at phone width).
 
 ```bash
 npm run lint
