@@ -19,7 +19,7 @@ export default function Timeline({ rows, lang, t, onPick }: {
   useEffect(() => {
     const el = box.current;
     if (!el) return;
-    const measure = () => setWidth(Math.max(280, Math.round(el.getBoundingClientRect().width)));
+    const measure = () => setWidth(Math.max(280, el.clientWidth));
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);

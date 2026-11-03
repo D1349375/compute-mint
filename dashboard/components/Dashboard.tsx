@@ -8,12 +8,14 @@ import { useGateway } from "@/lib/useGateway";
 
 import BenchPanel from "./BenchPanel";
 import BillingBanner from "./BillingBanner";
+import FlywheelPanel from "./FlywheelPanel";
 import KpiRow from "./KpiRow";
 import LaneMix from "./LaneMix";
 import Logo from "./Logo";
 import PayloadViewer from "./PayloadViewer";
 import RequestTable from "./RequestTable";
 import ReviewQueuePanel from "./ReviewQueuePanel";
+import SameDollar from "./SameDollar";
 import Timeline from "./Timeline";
 
 const LANG_KEY = "cm-dashboard-lang";
@@ -22,18 +24,23 @@ export default function Dashboard({ bench }: { bench: BenchEvidence | null }) {
   const [lang, setLang] = useState<Lang>("en");
   const [session, setSession] = useState<string | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
+  // ?present=1: the layout for a screen recording (larger type, no controls, no request table).
+  const [present, setPresent] = useState(false);
   const { data, refresh } = useGateway(session);
   const t = STRINGS[lang];
 
   useEffect(() => {
-    let wanted = new URLSearchParams(window.location.search).get("lang");
+    const params = new URLSearchParams(window.location.search);
+    // Reading the URL and the saved language after hydration.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPresent(params.get("present") === "1");
+    let wanted = params.get("lang");
     try {
       wanted = wanted ?? localStorage.getItem(LANG_KEY);
     } catch {
       /* storage unavailable: keep the default */
     }
     // Restoring a per-viewer preference (?lang=zh or the last choice) after hydration.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (wanted === "en" || wanted === "zh") setLang(wanted);
   }, []);
 
@@ -55,7 +62,7 @@ export default function Dashboard({ bench }: { bench: BenchEvidence | null }) {
   }, [rows, selected]);
 
   return (
-    <div className="page">
+    <div className={`page${present ? " present" : ""}`}>
       <header className="top">
         <div className="brand">
           <Logo />
@@ -108,7 +115,12 @@ export default function Dashboard({ bench }: { bench: BenchEvidence | null }) {
       )}
 
       <BillingBanner status={data.status} t={t} />
-      <KpiRow summary={data.summary} t={t} />
+      <KpiRow summary={data.summary} rows={rows} t={t} />
+
+      <section className="grid one-two">
+        <SameDollar summary={data.summary} rows={rows} bench={bench} t={t} />
+        <FlywheelPanel bench={bench} rows={rows} total={data.page?.total ?? rows.length} review={data.review} marks={data.marks} lang={lang} t={t} />
+      </section>
 
       <section className="grid two-one">
         <LaneMix rows={rows} lang={lang} t={t} />
@@ -120,10 +132,10 @@ export default function Dashboard({ bench }: { bench: BenchEvidence | null }) {
         <ReviewQueuePanel review={data.review} t={t} onDecided={refresh} />
       </section>
 
-      <RequestTable rows={rows} lang={lang} t={t} selected={shown} onPick={setSelected} />
+      {!present && <RequestTable rows={rows} lang={lang} t={t} selected={shown} onPick={setSelected} />}
       <BenchPanel bench={bench} t={t} />
 
-      <footer className="foot">{t.footer}</footer>
+      {!present && <footer className="foot">{t.footer}</footer>}
     </div>
   );
 }

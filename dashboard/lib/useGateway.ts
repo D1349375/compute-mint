@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import type { RequestPage, RequestRow, ReviewQueue, SessionRow, Status, Summary } from "./types";
+import type { RequestPage, RequestRow, ReviewMark, ReviewQueue, SessionRow, Status, Summary } from "./types";
 
 const POLL_MS = 4000;
 // The timeline and lane mix are drawn from the newest rows; the gateway caps a page at 500.
@@ -14,6 +14,8 @@ export interface GatewayData {
   page: RequestPage | null;
   sessions: SessionRow[];
   review: ReviewQueue | null;
+  /** Rule-count growth seen while the page was open, oldest first. */
+  marks: ReviewMark[];
   online: boolean | null;
   updatedAt: number | null;
 }
@@ -26,9 +28,10 @@ async function get<T>(path: string): Promise<T> {
 
 export function useGateway(session: string | null) {
   const [data, setData] = useState<GatewayData>({
-    status: null, summary: null, page: null, sessions: [], review: null, online: null, updatedAt: null,
+    status: null, summary: null, page: null, sessions: [], review: null, marks: [], online: null, updatedAt: null,
   });
   const seq = useRef(0);
+  const rules = useRef<number | null>(null);
 
   const refresh = useCallback(async () => {
     const mine = ++seq.current;
@@ -42,7 +45,14 @@ export function useGateway(session: string | null) {
         get<ReviewQueue>("review"),
       ]);
       if (mine !== seq.current) return;
-      setData({ status, summary, page, sessions: sessions.sessions, review, online: true, updatedAt: Date.now() });
+      const now = review.rules.length;
+      const added = rules.current == null ? 0 : now - rules.current;
+      rules.current = now;
+      setData((d) => ({
+        status, summary, page, sessions: sessions.sessions, review,
+        marks: added > 0 ? [...d.marks, { ts: Date.now() / 1000, rules: now, added }] : d.marks,
+        online: true, updatedAt: Date.now(),
+      }));
     } catch {
       if (mine !== seq.current) return;
       setData((d) => ({ ...d, online: false, updatedAt: Date.now() }));
@@ -51,7 +61,6 @@ export function useGateway(session: string | null) {
 
   useEffect(() => {
     // Polling an external system: the state update happens in the fetch callback.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     void refresh();
     const t = setInterval(refresh, POLL_MS);
     return () => clearInterval(t);
