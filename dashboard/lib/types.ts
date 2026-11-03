@@ -92,9 +92,24 @@ export interface BenchArm {
   cache_hit_rate: number | null;
 }
 
+// One row of bench/sample_results/reference-run/learning_curve.csv (x axis: task order within an arm).
+export interface CurvePoint {
+  index: number;
+  task: string;
+  phase: string;
+  e_cumulative: number;
+  e_window: number;
+  /** Review decisions made so far (rule-learning arm only). */
+  rules_learned: number | null;
+  /** Paths waiting for a decision after this task (rule-learning arm only). */
+  review_pending: number | null;
+}
+
 export interface BenchEvidence {
   source: string;
   tasks: number;
   upstream: string;
   arms: BenchArm[];
+  /** Per-task series by arm key; null when learning_curve.csv is missing. */
+  curve: Record<string, CurvePoint[]> | null;
 }

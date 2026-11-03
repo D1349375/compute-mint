@@ -6,7 +6,7 @@ went and why, the exact masked context that left the machine, the review queue, 
 ![overview](docs/screenshots/01-overview-1920x1080.png)
 
 It reads the gateway through a same-origin proxy (`app/api/gw/[...path]`) that forwards only the read-only views and
-the review decision, and it reads `bench/sample_results/reference-run/results.json` on the server. It calls no model.
+the review decision, and it reads `bench/sample_results/reference-run/results.json` and `learning_curve.csv` on the server. It calls no model.
 
 ## Run the demo (no API key, no network)
 
@@ -67,7 +67,10 @@ request and that on credits only Contributor requests reached the mock Meta host
 | Section | Source |
 |---|---|
 | Billing mode | `GET /v1/status`: `credits` or `paid`, and where non-contributable requests go |
-| Saved, compute ×, e, cache hit, credits used, stayed local | `GET /v1/ledger/summary` (`?session=` with the session filter) |
+| Saved, e, cache hit, credits used, stayed local | `GET /v1/ledger/summary` (`?session=` with the session filter) |
+| Effective compute × | Recomputed on the page from the request rows, see "The compute × figure" below |
+| Same $1 | `summaries` of the bench reference run (arms 1 and 5) |
+| Flywheel curve | `learning_curve.csv` of the bench reference run (arms 1, 3, 5, 6) |
 | Where requests went, timeline, requests table | `GET /v1/ledger/requests` (newest 500 rows) |
 | What left this machine | `GET /v1/ledger/requests/{id}`: `sent_payload` of a Contributor request, placeholders highlighted. Defaults to the newest one with masked values; click a Contributor row or dot to show another |
 | Review queue | `GET /v1/review`, `POST /v1/review/{id}`. Paths that share a suggested pattern are shown together, because one decision settles all of them |
@@ -75,6 +78,45 @@ request and that on credits only Contributor requests reached the mock Meta host
 
 Numbers are the gateway's own definitions: a local request costs nothing and counts its Standard price as the
 counterfactual; a held request has neither. Amounts in the demo are cents because the sessions are short.
+"Saved" keeps that definition; the compute × figure does not, see below.
+
+### The compute × figure
+
+The gateway's `effective_compute_multiplier` is counterfactual ÷ spent over all requests. A local request spends $0
+but keeps its Standard price in the counterfactual, so every local request raises the multiplier without any model
+discount being involved: the seed data shows **9.11×** this way. The page therefore recomputes it over the requests
+that were billed, Contributor and Standard (6.14× on the seed data), and the card says how many local requests it
+left out and what they would have cost on Standard. Held requests have neither cost nor counterfactual. The
+gateway is unchanged and `/v1/ledger/summary` still returns 9.11×.
+
+The recomputation needs every row, and the page loads the newest 500. If a view has more requests than that, or no
+local request, the card shows the gateway's figure (the first case with a warning that it overstates). Even the
+recomputed number is inflated by the seed's tiny, very discounted Contributor requests; the figure to quote is the
+bench's, below.
+
+### Same $1 and the flywheel (bench evidence, mock upstream)
+
+Both panels sit under the KPIs and are labeled with the bench's upstream (`mock`): they show how routing, masking and
+rule learning change cost on 37 synthetic tasks, not a measurement on the real API.
+
+- **Same $1**: all Standard 1.00× against Mint + Broker + rule learning 1.66× (`compute_multiplier` of arms 1 and
+  5, the same numbers as the bench table), 37/37 accepted in both. "Tasks per $1" is passed tasks ÷ paid dollars of
+  the bench run ($0.1916 and $0.1156), so it is the same ratio again. The bars grow and the numbers count up once on
+  load (not with `prefers-reduced-motion`).
+- **Flywheel**: cumulative e (share of tokens served by Contributor) against task order for all Standard, Mint,
+  Mint + rule learning and the oracle ceiling (every path rule known from the start). End points are the summary's
+  0.0%, 9.8%, 48.5% and 52.9%. Bars under the plot are the review decisions made during each task (growth of
+  `rules_learned`; 35 in all), and the shaded stretch ends at the task by which 91% of them were made. The curve is
+  not a smooth climb: the first tasks swing because few have run, and the task mix is not uniform, so the caption
+  says to read the end points. What it shows is that Mint without rules stays near 10% while the arm that learns
+  from review decisions reaches the oracle's neighbourhood. Hover for the values of one task.
+
+### Recording mode: `?present=1`
+
+`http://localhost:3000/?present=1` (with `&lang=zh` for Chinese) is the layout for the 3-minute video at 1920×1080:
+everything is scaled 1.2× on screens at least 1400 px wide, the session picker, language switch, "updated" time,
+request table and footer are not rendered, and the rest is as in the normal page, in the same order (billing mode,
+KPIs, same $1 and flywheel, lanes, payload and review queue, bench table). Without the parameter nothing changes.
 
 ## Design
 
@@ -84,7 +126,8 @@ provider logo or trademark is used. Lane colors were checked with a color-vision
 also labeled in text. Built for a 1920×1080 recording; works down to phone width.
 
 Screenshots: `docs/screenshots/` (01 overview at 1920×1080, 02 full page, 03 full page in Traditional Chinese,
-04 phone width, 05 after a review decision and `--replay`).
+04 phone width in Chinese, 05 after a review decision and `--replay` (made before the compute × change), 06 and 07
+same $1 and flywheel in English and Chinese, 08 and 09 recording mode).
 
 ```bash
 npm run lint
